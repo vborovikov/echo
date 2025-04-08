@@ -97,6 +97,7 @@ public readonly struct UserId : IEquatable<UserId>, IComparable, IComparable<Use
     public static bool operator <=(UserId left, UserId right) => left.CompareTo(right) <= 0;
     public static implicit operator UserId(long guid) => new(guid);
     public static explicit operator long(UserId id) => id.value;
+    public static explicit operator ChatId(UserId id) => id.value;
 
     public static UserId ConvertFrom(object value, CultureInfo? culture = null) =>
         value switch

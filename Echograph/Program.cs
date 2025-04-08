@@ -51,7 +51,10 @@ class Program
                 if (message is not null)
                 {
                     Console.Out.WriteLine($"{message.From?.FirstName}: {message.Text}");
-                    var reply = await bot.ExecuteAsync(new ApiSendMessage(message.Chat.Id, message.Text), cts.Token);
+                    var reply = await bot.ExecuteAsync(new ApiSendMessage(message.Chat.Id, message.Text)
+                    {
+                        ReplyMarkup = new InlineKeyboardMarkup([[new("Yes"), new("No")]])
+                    }, cts.Token);
                     Console.Out.WriteLine($"{reply.From?.FirstName}: {reply.Text}");
                 }
                 else

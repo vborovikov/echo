@@ -8,7 +8,6 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Echo.Telegram;
 using Microsoft.Extensions.Logging;
 using Telegram;
 using Telegram.Serialization;
@@ -50,6 +49,8 @@ public sealed class TelegramBot
         Debug.WriteLine(JsonSerializer.Serialize(request, request.GetType(), jsonOptions));
 #endif
 
+        this.log.LogTrace(EventIds.BotExecuting, "Executing Bot API request '{Method}'", request.Method);
+
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri($"/bot{this.token}/{request.Method}", UriKind.Relative))
         {
             Content = JsonContent.Create(request, request.GetType(), jsonMediaType, jsonOptions)
@@ -83,10 +84,13 @@ public sealed class TelegramBot
         var updateRequest = new ApiGetUpdates { Offset = 0 };
         while (!cts.Token.IsCancellationRequested)
         {
+            this.log.LogDebug(EventIds.BotWaiting, "Waiting for updates");
             var updates = await ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
 
             if (updates.Length > 0)
             {
+                this.log.LogTrace(EventIds.BotWaiting, "Received {Count} updates", updates.Length);
+
                 var offset = 0;
                 foreach (var update in updates)
                 {

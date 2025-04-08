@@ -76,7 +76,7 @@ public record InlineKeyboardMarkup(InlineKeyboardButton[][] InlineKeyboard) : Re
 public record InlineKeyboardButton(string Text)
 {
     public string? Url { get; init; }
-    public string? CallbackData { get; init; }
+    public string CallbackData { get; init; } = Text;
     public CopyTextButton? CopyText { get; init; }
 }
 
@@ -85,7 +85,7 @@ public record CopyTextButton(string Text);
 public record ReplyKeyboardMarkup(KeyboardButton[][] Keyboard) : ReplyMarkup
 {
     public bool? IsPersistent { get; init; }
-    public bool? ResizeKeyboard { get; init; }
+    public bool ResizeKeyboard { get; init; } = true;
     public bool? OneTimeKeyboard { get; init; }
     public string? InputFieldPlaceholder { get; init; }
     public bool? Selective { get; init; }
