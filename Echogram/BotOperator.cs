@@ -8,7 +8,7 @@ using Telegram;
 
 public interface IBotOperator : IBot
 {
-    void Stop(IBotDialog dialog);
+    Task StopAsync(IBotDialog dialog, CancellationToken cancellationToken);
 }
 
 public class BotOperator<TBotDialog> : IBotOperator
@@ -30,9 +30,12 @@ public class BotOperator<TBotDialog> : IBotOperator
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
 
-    void IBotOperator.Stop(IBotDialog dialog)
+    async Task IBotOperator.StopAsync(IBotDialog dialog, CancellationToken cancellationToken)
     {
-        this.dialogs.Remove(dialog.ChatId, out _);
+        if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
+        {
+            await removedDialog.EndAsync(cancellationToken);
+        }
     }
 
     public async Task ChatAsync(CancellationToken cancellationToken)
@@ -113,9 +116,13 @@ public class BotOperator<TBotDialog> : IBotOperator
             await Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (message, cancellationToken) =>
                 {
-                    var dialog = GetDialog(message.Chat.Id);
+                    var dialog = GetDialog(message.Chat.Id, out var maybeNew);
                     try
                     {
+                        if (maybeNew)
+                        {
+                            await dialog.BeginAsync(cancellationToken).ConfigureAwait(false);
+                        }
                         await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception x) when (x is not OperationCanceledException)
@@ -139,7 +146,7 @@ public class BotOperator<TBotDialog> : IBotOperator
             await Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (callback, cancellationToken) =>
                 {
-                    var dialog = GetDialog((ChatId)callback.From.Id);
+                    var dialog = GetDialog((ChatId)callback.From.Id, out _);
                     try
                     {
                         await dialog.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
@@ -158,8 +165,15 @@ public class BotOperator<TBotDialog> : IBotOperator
         }
     }
 
-    private TBotDialog GetDialog(ChatId chatId)
+    private TBotDialog GetDialog(ChatId chatId, out bool maybeNew)
     {
-        return this.dialogs.GetOrAdd(chatId, (chatId, manager) => manager.factory.Create(manager, chatId), this);
+        if (this.dialogs.TryGetValue(chatId, out var dialog))
+        {
+            maybeNew = false;
+            return dialog;
+        }
+
+        maybeNew = true;
+        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.factory.Create(botOperator, chatId), this);
     }
 }

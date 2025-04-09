@@ -159,4 +159,3 @@ public sealed record ApiSetMyCommands(BotCommand[] Commands) : ApiRequest<bool>(
     public BotCommandScope? Scope { get; init; }
     public string? LanguageCode { get; init; }
 }
-
