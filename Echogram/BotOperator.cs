@@ -61,13 +61,23 @@ public class BotOperator<TBotDialog> : IBotOperator
                 HandleMessagesAsync(messageChannel, cancellationToken),
                 HandleCallbacksAsync(callbackChannel, cancellationToken)).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            foreach (var (_, dialog) in this.dialogs)
+            {
+                await dialog.EndAsync(default).ConfigureAwait(false);
+            }
+            this.dialogs.Clear();
+
+            throw;
+        }
         catch (Exception x) when (x is not OperationCanceledException)
         {
             this.log.LogError(EventIds.BotFailed, x, "Bot operation failed");
         }
         finally
         {
-            await TBotDialog.StopAsync(this, cancellationToken).ConfigureAwait(false);
+            await TBotDialog.StopAsync(this, default).ConfigureAwait(false);
             this.log.LogInformation(EventIds.BotStopped, "Bot operation stopped");
         }
     }
