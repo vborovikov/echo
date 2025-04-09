@@ -6,16 +6,15 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Telegram;
 
-//todo: rename to BotOperator
-public class BotManager<TBotDialog> : IBot
+public class BotOperator<TBotDialog> : IBot
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBotDialogFactory<TBotDialog> factory;
     private readonly TelegramBot bot;
-    private readonly ILogger<BotManager<TBotDialog>> log;
+    private readonly ILogger<BotOperator<TBotDialog>> log;
     private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
 
-    public BotManager(IBotDialogFactory<TBotDialog> factory, TelegramBot bot, ILogger<BotManager<TBotDialog>> logger)
+    public BotOperator(IBotDialogFactory<TBotDialog> factory, TelegramBot bot, ILogger<BotOperator<TBotDialog>> logger)
     {
         this.factory = factory;
         this.bot = bot;
@@ -49,7 +48,7 @@ public class BotManager<TBotDialog> : IBot
                 HandleMessagesAsync(messageChannel, cancellationToken),
                 HandleCallbacksAsync(callbackChannel, cancellationToken)).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        catch (Exception x) when (x is not OperationCanceledException)
         {
             this.log.LogError(EventIds.BotFailed, x, "Bot operation failed");
         }
@@ -82,7 +81,7 @@ public class BotManager<TBotDialog> : IBot
                     }
                 }).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        catch (Exception x) when (x is not OperationCanceledException)
         {
             messageWriter.Complete(x);
             callbackWriter.Complete(x);
@@ -109,14 +108,14 @@ public class BotManager<TBotDialog> : IBot
                     {
                         await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }
-                    catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+                    catch (Exception x) when (x is not OperationCanceledException)
                     {
                         this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
                         await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        catch (Exception x) when (x is not OperationCanceledException)
         {
             this.log.LogError(EventIds.BotFailed, x, "Failed to handle messages");
             throw;
@@ -135,14 +134,14 @@ public class BotManager<TBotDialog> : IBot
                     {
                         await dialog.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
                     }
-                    catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+                    catch (Exception x) when (x is not OperationCanceledException)
                     {
                         this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
                         await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        catch (Exception x) when (x is not OperationCanceledException)
         {
             this.log.LogError(EventIds.BotFailed, x, "Failed to handle callback queries");
             throw;

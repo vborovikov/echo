@@ -12,11 +12,17 @@ using Microsoft.Extensions.Logging;
 using Telegram;
 using Telegram.Serialization;
 
+/// <summary>
+/// Provides access to the Telegram Bot API.
+/// </summary>
 public interface IBot
 {
     Task<TResult> ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Telegram Bot API client.
+/// </summary>
 public sealed class TelegramBot : IBot
 {
     private static readonly MediaTypeHeaderValue jsonMediaType = new("application/json");
