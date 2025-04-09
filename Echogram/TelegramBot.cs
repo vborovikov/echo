@@ -12,7 +12,12 @@ using Microsoft.Extensions.Logging;
 using Telegram;
 using Telegram.Serialization;
 
-public sealed class TelegramBot
+public interface IBot
+{
+    Task<TResult> ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken);
+}
+
+public sealed class TelegramBot : IBot
 {
     private static readonly MediaTypeHeaderValue jsonMediaType = new("application/json");
     private static readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.General)
@@ -22,8 +27,8 @@ public sealed class TelegramBot
         PropertyNameCaseInsensitive = true,
         Converters =
         {
-            new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false),
             new JsonStringArrayEnumConverter(JsonNamingPolicy.SnakeCaseLower),
+            new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false),
         }
     };
 
@@ -82,10 +87,20 @@ public sealed class TelegramBot
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, enumeratorCancellationToken);
 
         var updateRequest = new ApiGetUpdates { Offset = 0 };
-        while (!cts.Token.IsCancellationRequested)
+        while (true)
         {
-            this.log.LogDebug(EventIds.BotWaiting, "Waiting for updates");
-            var updates = await ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
+            cts.Token.ThrowIfCancellationRequested();
+
+            var updates = Array.Empty<Update>();
+            try
+            {
+                this.log.LogDebug(EventIds.BotWaiting, "Waiting for updates");
+                updates = await ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                throw;
+            }
 
             if (updates.Length > 0)
             {

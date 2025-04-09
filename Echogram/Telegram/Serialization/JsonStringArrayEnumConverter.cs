@@ -47,11 +47,13 @@ public class JsonStringArrayEnumConverter : JsonConverterFactory
 sealed class JsonStringArrayEnumConverter<TEnum> : JsonConverter<TEnum>
     where TEnum : struct, Enum
 {
-    private readonly JsonNamingPolicy? namingPolicy;
+    private readonly JsonNamingPolicy namingPolicy;
+
+    public JsonStringArrayEnumConverter() : this(null) { }
 
     public JsonStringArrayEnumConverter(JsonNamingPolicy? namingPolicy = null)
     {
-        this.namingPolicy = namingPolicy;
+        this.namingPolicy = namingPolicy ?? JsonNamingPolicy.SnakeCaseLower;
     }
 
     /// <inheritdoc />
@@ -92,7 +94,7 @@ sealed class JsonStringArrayEnumConverter<TEnum> : JsonConverter<TEnum>
         {
             foreach (var enumName in value.ToString().Split(','))
             {
-                writer.WriteStringValue(this.namingPolicy?.ConvertName(enumName) ?? enumName);
+                writer.WriteStringValue(this.namingPolicy.ConvertName(enumName) ?? enumName);
             }
         }
         writer.WriteEndArray();

@@ -2,7 +2,6 @@
 
 using System;
 using System.Text;
-using Echo.Telegram;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,12 +38,10 @@ class Program
         try
         {
             await using var sp = ConfigureApp(args);
-            var bot = sp.GetRequiredService<TelegramBot>();
-            var logging = sp.GetRequiredService<ILoggerFactory>();
+            var bot = sp.GetRequiredService<BotManager<EchoBotDialog>>();
 
-            var botManager = await BotManager.CreateAsync(bot, EchoBotDialog.Factory, logging, cts.Token);
             Console.Error.WriteLine("Bot started chatting.");
-            await botManager.ChatAsync(cts.Token);
+            await bot.ChatAsync(cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -95,6 +92,9 @@ class Program
             var logging = sp.GetRequiredService<ILoggerFactory>();
             return new TelegramBot(botToken, http, logging.CreateLogger<TelegramBot>());
         });
+
+        services.AddSingleton(EchoBotDialog.Factory);
+        services.AddSingleton<BotManager<EchoBotDialog>>();
 
         return services.BuildServiceProvider();
     }

@@ -6,41 +6,32 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Telegram;
 
-public interface IChat
+//todo: rename to BotOperator
+public class BotManager<TBotDialog> : IBot
+    where TBotDialog : IBotDialog<TBotDialog>
 {
-    TelegramBot Bot { get; }
-}
-
-public class BotManager : IChat
-{
-    private readonly BotUser id;
+    private readonly IBotDialogFactory<TBotDialog> factory;
     private readonly TelegramBot bot;
-    private readonly IBotDialogFactory factory;
-    private readonly ILogger<BotManager> log;
-    private readonly ConcurrentDictionary<ChatId, IBotDialog> dialogs;
+    private readonly ILogger<BotManager<TBotDialog>> log;
+    private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
 
-    private BotManager(BotUser id, TelegramBot bot, IBotDialogFactory dialogFactory, ILogger<BotManager> logger)
+    public BotManager(IBotDialogFactory<TBotDialog> factory, TelegramBot bot, ILogger<BotManager<TBotDialog>> logger)
     {
-        this.id = id;
+        this.factory = factory;
         this.bot = bot;
-        this.factory = dialogFactory;
         this.log = logger;
         this.dialogs = new();
     }
 
-    public TelegramBot Bot => this.bot;
-
-    public static async Task<BotManager> CreateAsync(TelegramBot bot, IBotDialogFactory dialogFactory, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
-    {
-        var botUser = await bot.ExecuteAsync(ApiGetMe.Default, cancellationToken);
-        return new(botUser, bot, dialogFactory, loggerFactory.CreateLogger<BotManager>());
-    }
+    Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
+        this.bot.ExecuteAsync(request, cancellationToken);
 
     public async Task ChatAsync(CancellationToken cancellationToken)
     {
         try
         {
-            this.log.LogInformation(EventIds.BotStarted, "Bot {BotUsername} started", this.id.Username);
+            await TBotDialog.StartAsync(this, cancellationToken).ConfigureAwait(false);
+            this.log.LogInformation(EventIds.BotStarted, "Bot operation started");
 
             var messageChannel = Channel.CreateUnbounded<Message>(new()
             {
@@ -56,15 +47,16 @@ public class BotManager : IChat
             await Task.WhenAll(
                 ReceiveUpdatesAsync(messageChannel, callbackChannel, cancellationToken),
                 HandleMessagesAsync(messageChannel, cancellationToken),
-                HandleCallbacksAsync(callbackChannel, cancellationToken));
+                HandleCallbacksAsync(callbackChannel, cancellationToken)).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
+        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
         {
-            this.log.LogError(EventIds.BotFailed, x, "Bot {BotUsername} failed", this.id.Username);
+            this.log.LogError(EventIds.BotFailed, x, "Bot operation failed");
         }
         finally
         {
-            this.log.LogInformation(EventIds.BotStopped, "Bot {BotUsername} stopped", this.id.Username);
+            await TBotDialog.StopAsync(this, cancellationToken).ConfigureAwait(false);
+            this.log.LogInformation(EventIds.BotStopped, "Bot operation stopped");
         }
     }
 
@@ -74,27 +66,28 @@ public class BotManager : IChat
         {
             await Parallel.ForEachAsync(this.bot.GetAllUpdatesAsync(cancellationToken), cancellationToken,
                 async (update, cancellationToken) =>
-            {
-                var message = update.Message ?? update.EditedMessage ?? update.ChannelPost ?? update.EditedChannelPost;
-                if (message is not null)
                 {
-                    await messageWriter.WriteAsync(message, cancellationToken);
-                }
-                else if (update.CallbackQuery is CallbackQuery callback)
-                {
-                    await callbackWriter.WriteAsync(callback, cancellationToken);
-                }
-                else
-                {
-                    this.log.LogWarning(EventIds.BotConfused, "Received unknown update: {Update}", update);
-                }
-            });
+                    var message = update.Message ?? update.EditedMessage ?? update.ChannelPost ?? update.EditedChannelPost;
+                    if (message is not null)
+                    {
+                        await messageWriter.WriteAsync(message, cancellationToken).ConfigureAwait(false);
+                    }
+                    else if (update.CallbackQuery is CallbackQuery callback)
+                    {
+                        await callbackWriter.WriteAsync(callback, cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        this.log.LogWarning(EventIds.BotConfused, "Received unknown update: {Update}", update);
+                    }
+                }).ConfigureAwait(false);
         }
-        catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
+        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
         {
             messageWriter.Complete(x);
             callbackWriter.Complete(x);
 
+            this.log.LogError(EventIds.BotFailed, x, "Failed to receive updates");
             throw;
         }
         finally
@@ -104,44 +97,60 @@ public class BotManager : IChat
         }
     }
 
-    private Task HandleMessagesAsync(ChannelReader<Message> messageReader, CancellationToken cancellationToken)
+    private async Task HandleMessagesAsync(ChannelReader<Message> messageReader, CancellationToken cancellationToken)
     {
-        return Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
-            async (message, cancellationToken) =>
-            {
-                var dialog = GetDialog(message.Chat.Id);
-                try
+        try
+        {
+            await Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
+                async (message, cancellationToken) =>
                 {
-                    await dialog.HandleAsync(message, cancellationToken);
-                }
-                catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
-                {
-                    this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
-                    await dialog.HandleAsync(x, cancellationToken);
-                }
-            });
+                    var dialog = GetDialog(message.Chat.Id);
+                    try
+                    {
+                        await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+                    {
+                        this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
+                        await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                    }
+                }).ConfigureAwait(false);
+        }
+        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        {
+            this.log.LogError(EventIds.BotFailed, x, "Failed to handle messages");
+            throw;
+        }
     }
 
-    private Task HandleCallbacksAsync(ChannelReader<CallbackQuery> callbackReader, CancellationToken cancellationToken)
+    private async Task HandleCallbacksAsync(ChannelReader<CallbackQuery> callbackReader, CancellationToken cancellationToken)
     {
-        return Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
-            async (callback, cancellationToken) =>
-            {
-                var dialog = GetDialog((ChatId)callback.From.Id);
-                try
+        try
+        {
+            await Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
+                async (callback, cancellationToken) =>
                 {
-                    await dialog.HandleAsync(callback, cancellationToken);
-                }
-                catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
-                {
-                    this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
-                    await dialog.HandleAsync(x, cancellationToken);
-                }
-            });
+                    var dialog = GetDialog((ChatId)callback.From.Id);
+                    try
+                    {
+                        await dialog.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+                    {
+                        this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
+                        await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                    }
+                }).ConfigureAwait(false);
+        }
+        catch (Exception x) when (x is not OperationCanceledException /*ocx || ocx.CancellationToken != cancellationToken*/)
+        {
+            this.log.LogError(EventIds.BotFailed, x, "Failed to handle callback queries");
+            throw;
+        }
     }
 
-    private IBotDialog GetDialog(ChatId chatId)
+    private TBotDialog GetDialog(ChatId chatId)
     {
-        return this.dialogs.GetOrAdd(chatId, (chatId, manager) => manager.factory.Create(chatId, manager), this);
+        return this.dialogs.GetOrAdd(chatId, (chatId, manager) => manager.factory.Create(manager, chatId), this);
     }
 }
