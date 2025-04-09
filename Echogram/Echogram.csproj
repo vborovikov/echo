@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Echo</RootNamespace>
-    <Description>Telegram bot interaction</Description>
+    <Description>Telegram bot operator</Description>
   </PropertyGroup>
 
   <ItemGroup>
