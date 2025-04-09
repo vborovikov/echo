@@ -40,28 +40,11 @@ class Program
         {
             await using var sp = ConfigureApp(args);
             var bot = sp.GetRequiredService<TelegramBot>();
+            var logging = sp.GetRequiredService<ILoggerFactory>();
 
-            var botUser = await bot.ExecuteAsync(ApiGetMe.Default, default);
-            Console.Out.WriteLine(botUser.ToString());
-
+            var botManager = await BotManager.CreateAsync(bot, EchoBotDialog.Factory, logging, cts.Token);
             Console.Error.WriteLine("Bot started chatting.");
-            await foreach (var update in bot.GetAllUpdatesAsync(cts.Token))
-            {
-                var message = update.Message ?? update.EditedMessage ?? update.ChannelPost ?? update.EditedChannelPost;
-                if (message is not null)
-                {
-                    Console.Out.WriteLine($"{message.From?.FirstName}: {message.Text}");
-                    var reply = await bot.ExecuteAsync(new ApiSendMessage(message.Chat.Id, message.Text)
-                    {
-                        ReplyMarkup = new InlineKeyboardMarkup([[new("Yes"), new("No")]])
-                    }, cts.Token);
-                    Console.Out.WriteLine($"{reply.From?.FirstName}: {reply.Text}");
-                }
-                else
-                {
-                    Console.Out.WriteLine(update.ToString());
-                }
-            }
+            await botManager.ChatAsync(cts.Token);
         }
         catch (OperationCanceledException)
         {

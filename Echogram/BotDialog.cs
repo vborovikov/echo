@@ -7,31 +7,31 @@ using Telegram;
 
 public interface IBotDialogFactory
 {
-    public BotDialog Create(ChatId chatId, IChat chat);
+    public IBotDialog Create(ChatId chatId, IChat chat);
 }
 
 /// <summary>
 /// Represents a bot dialog with a user in a specific chat.
 /// </summary>
-public class BotDialog
+public interface IBotDialog
 {
-    private readonly ChatId chatId;
-
-    public BotDialog(ChatId chatId, IChat chat)
-    {
-        this.chatId = chatId;
-        this.Chat = chat;
-    }
-
-    public IChat Chat { get; }
-
-    public async Task HandleAsync(Message message, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task HandleAsync(CallbackQuery callback, CancellationToken cancellationToken)
-    {
-        throw new NotImplementedException();
-    }
+    Task HandleAsync(Exception error, CancellationToken cancellationToken);
+    Task HandleAsync(Message message, CancellationToken cancellationToken);
+    Task HandleAsync(CallbackQuery callback, CancellationToken cancellationToken);
 }
+
+//public abstract class BotDialog
+//{
+//    public BotDialog(ChatId chatId, IChat chat)
+//    {
+//        this.ChatId = chatId;
+//        this.Chat = chat;
+//    }
+
+//    public ChatId ChatId { get; }
+//    public IChat Chat { get; }
+
+//    public abstract Task HandleAsync(Message message, CancellationToken cancellationToken);
+
+//    public abstract Task HandleAsync(CallbackQuery callback, CancellationToken cancellationToken);
+//}

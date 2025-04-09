@@ -8,6 +8,7 @@ using Telegram;
 
 public interface IChat
 {
+    TelegramBot Bot { get; }
 }
 
 public class BotManager : IChat
@@ -16,7 +17,7 @@ public class BotManager : IChat
     private readonly TelegramBot bot;
     private readonly IBotDialogFactory factory;
     private readonly ILogger<BotManager> log;
-    private readonly ConcurrentDictionary<ChatId, BotDialog> dialogs;
+    private readonly ConcurrentDictionary<ChatId, IBotDialog> dialogs;
 
     private BotManager(BotUser id, TelegramBot bot, IBotDialogFactory dialogFactory, ILogger<BotManager> logger)
     {
@@ -26,6 +27,8 @@ public class BotManager : IChat
         this.log = logger;
         this.dialogs = new();
     }
+
+    public TelegramBot Bot => this.bot;
 
     public static async Task<BotManager> CreateAsync(TelegramBot bot, IBotDialogFactory dialogFactory, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
     {
@@ -106,15 +109,15 @@ public class BotManager : IChat
         return Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
             async (message, cancellationToken) =>
             {
+                var dialog = GetDialog(message.Chat.Id);
                 try
                 {
-                    var dialog = GetDialog(message.Chat.Id);
                     await dialog.HandleAsync(message, cancellationToken);
                 }
                 catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
                 {
                     this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
-                    //todo: send message that bot is not okay
+                    await dialog.HandleAsync(x, cancellationToken);
                 }
             });
     }
@@ -124,20 +127,20 @@ public class BotManager : IChat
         return Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
             async (callback, cancellationToken) =>
             {
+                var dialog = GetDialog((ChatId)callback.From.Id);
                 try
                 {
-                    var dialog = GetDialog((ChatId)callback.From.Id);
                     await dialog.HandleAsync(callback, cancellationToken);
                 }
                 catch (Exception x) when (x is not OperationCanceledException ocx || ocx.CancellationToken != cancellationToken)
                 {
                     this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
-                    //todo: send message that bot is not okay
+                    await dialog.HandleAsync(x, cancellationToken);
                 }
             });
     }
 
-    private BotDialog GetDialog(ChatId chatId)
+    private IBotDialog GetDialog(ChatId chatId)
     {
         return this.dialogs.GetOrAdd(chatId, (chatId, manager) => manager.factory.Create(chatId, manager), this);
     }
