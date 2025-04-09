@@ -134,3 +134,29 @@ public sealed record ApiSendMessage(ChatId ChatId, string Text) : ApiRequest<Mes
     public ReplyParameters? ReplyParameters { get; init; }
     public ReplyMarkup? ReplyMarkup { get; init; }
 }
+
+public record BotCommand(string Command, string Description);
+
+public enum BotCommandScopeType
+{
+    Default,
+    AllPrivateChats,
+    AllGroupChats,
+    AllChatAdministrators,
+    Chat,
+    ChatAdministrators,
+    ChatMember,
+}
+
+public record BotCommandScope(BotCommandScopeType Type)
+{
+    public ChatId? ChatId { get; init; }
+    public UserId? UserId { get; init; }
+}
+
+public sealed record ApiSetMyCommands(BotCommand[] Commands) : ApiRequest<bool>("setMyCommands")
+{
+    public BotCommandScope? Scope { get; init; }
+    public string? LanguageCode { get; init; }
+}
+

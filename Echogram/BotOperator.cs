@@ -6,7 +6,12 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Telegram;
 
-public class BotOperator<TBotDialog> : IBot
+public interface IBotOperator : IBot
+{
+    void Stop(IBotDialog dialog);
+}
+
+public class BotOperator<TBotDialog> : IBotOperator
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBotDialogFactory<TBotDialog> factory;
@@ -24,6 +29,11 @@ public class BotOperator<TBotDialog> : IBot
 
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
+
+    void IBotOperator.Stop(IBotDialog dialog)
+    {
+        this.dialogs.Remove(dialog.ChatId, out _);
+    }
 
     public async Task ChatAsync(CancellationToken cancellationToken)
     {
