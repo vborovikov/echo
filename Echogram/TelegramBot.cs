@@ -1,4 +1,4 @@
-#define DUMP_JSON
+#undef DUMP_JSON
 
 namespace Echo;
 

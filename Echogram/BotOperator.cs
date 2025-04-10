@@ -35,6 +35,7 @@ public class BotOperator<TBotDialog> : IBotOperator
         if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
         {
             await removedDialog.EndAsync(cancellationToken);
+            removedDialog.Dispose();
         }
     }
 

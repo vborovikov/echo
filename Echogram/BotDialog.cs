@@ -23,7 +23,7 @@ public interface IBotDialogFactory<TBotDialog> where TBotDialog : IBotDialog<TBo
 /// <summary>
 /// Represents a bot dialog with a user in a specific chat.
 /// </summary>
-public interface IBotDialog
+public interface IBotDialog : IDisposable
 {
     /// <summary>
     /// The unique identifier of the chat.
