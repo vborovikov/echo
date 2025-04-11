@@ -6,11 +6,17 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Telegram;
 
+/// <summary>
+/// Operates the bot dialogs.
+/// </summary>
 public interface IBotOperator : IBot
 {
     Task StopAsync(IBotDialog dialog, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Operates the bot dialogs.
+/// </summary>
 public class BotOperator<TBotDialog> : IBotOperator
     where TBotDialog : IBotDialog<TBotDialog>
 {
