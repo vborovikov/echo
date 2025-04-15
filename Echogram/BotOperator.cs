@@ -14,10 +14,16 @@ public interface IBotOperator : IBot
     Task StopAsync(IBotDialog dialog, CancellationToken cancellationToken);
 }
 
+public interface IBotOperator<TBotDialog> : IBotOperator
+    where TBotDialog : IBotDialog<TBotDialog>
+{
+    Task<TBotDialog> StartAsync(ChatId chatId, CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// Operates the bot dialogs.
 /// </summary>
-public class BotOperator<TBotDialog> : IBotOperator
+public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBotDialogFactory<TBotDialog> factory;
@@ -35,6 +41,17 @@ public class BotOperator<TBotDialog> : IBotOperator
 
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
+
+    async Task<TBotDialog> IBotOperator<TBotDialog>.StartAsync(ChatId chatId, CancellationToken cancellationToken)
+    {
+        var dialog = GetDialog(chatId, out var maybeNew);
+        if (maybeNew)
+        {
+            await dialog.BeginAsync(cancellationToken);
+        }
+
+        return dialog;
+    }
 
     async Task IBotOperator.StopAsync(IBotDialog dialog, CancellationToken cancellationToken)
     {
