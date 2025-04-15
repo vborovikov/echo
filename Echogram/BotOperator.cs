@@ -47,7 +47,7 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         var dialog = GetDialog(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await dialog.BeginAsync(cancellationToken);
+            await dialog.BeginAsync(cancellationToken).ConfigureAwait(false);
         }
 
         return dialog;
@@ -57,7 +57,7 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     {
         if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
         {
-            await removedDialog.EndAsync(cancellationToken);
+            await removedDialog.EndAsync(cancellationToken).ConfigureAwait(false);
             removedDialog.Dispose();
         }
     }

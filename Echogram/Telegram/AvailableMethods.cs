@@ -18,25 +18,6 @@ record ApiResponse<TResult> : ApiResponse
 /// <param name="Method">The API method to call.</param>
 public abstract record ApiRequest<TResult>(string Method);
 
-/// <summary>
-/// Returns basic information about the bot in form of a <see cref="User"/> object.
-/// </summary>
-public sealed record ApiGetMe() : ApiRequest<BotUser>("getMe")
-{
-    public static readonly ApiGetMe Default = new();
-}
-
-/// <summary>
-/// Receives incoming updates using long polling.
-/// </summary>
-sealed record ApiGetUpdates() : ApiRequest<Update[]>("getUpdates")
-{
-    public int? Offset { get; init; }
-    public int? Limit { get; init; } = 100;
-    public int? Timeout { get; init; } = 60;
-    public UpdateType AllowedUpdates { get; init; }
-}
-
 public enum ParseMode
 {
     Default,
@@ -119,27 +100,6 @@ public record ForceReplyMarkup : ReplyMarkup
     public string? InputFieldPlaceholder { get; init; }
 }
 
-/// <summary>
-/// Sends a message to a chat.
-/// </summary>
-public sealed record ApiSendMessage(ChatId ChatId, string Text) : ApiRequest<Message>("sendMessage")
-{
-    public ParseMode? ParseMode { get; init; }
-    public MessageEntity[]? Entities { get; init; }
-    public LinkPreviewOptions? LinkPreviewOptions { get; init; }
-    public bool? DisableNotification { get; init; }
-    public bool? ProtectContent { get; init; }
-    public string? MessageEffectId { get; init; }
-    /// <summary>
-    /// Description of the message to reply to.
-    /// </summary>
-    /// <remarks>
-    /// The original message will be quoted.
-    /// </remarks>
-    public ReplyParameters? ReplyParameters { get; init; }
-    public ReplyMarkup? ReplyMarkup { get; init; }
-}
-
 public record BotCommand(string Command, string Description);
 
 public enum BotCommandScopeType
@@ -159,16 +119,84 @@ public record BotCommandScope(BotCommandScopeType Type)
     public UserId? UserId { get; init; }
 }
 
-public sealed record ApiSetMyCommands(BotCommand[] Commands) : ApiRequest<bool>("setMyCommands")
+public static class Api
 {
-    public BotCommandScope? Scope { get; init; }
-    public string? LanguageCode { get; init; }
-}
+    /// <summary>
+    /// Returns basic information about the bot in form of a <see cref="User"/> object.
+    /// </summary>
+    public sealed record GetMe() : ApiRequest<BotUser>("getMe")
+    {
+        public static readonly GetMe Default = new();
+    }
 
-public sealed record ApiAnswerCallbackQuery(string CallbackQueryId) : ApiRequest<bool>("answerCallbackQuery")
-{
-    public string? Text { get; init; }
-    public bool ShowAlert { get; init; }
-    public bool? Url { get; init; }
-    public int CacheTime { get; init; }
+    public static Task<BotUser> GetMeAsync(this IBot bot, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(GetMe.Default, cancellationToken);
+    }
+
+    /// <summary>
+    /// Receives incoming updates using long polling.
+    /// </summary>
+    internal sealed record GetUpdates() : ApiRequest<Update[]>("getUpdates")
+    {
+        public int? Offset { get; init; }
+        public int? Limit { get; init; } = 100;
+        public int? Timeout { get; init; } = 60;
+        public UpdateType AllowedUpdates { get; init; }
+    }
+
+    /// <summary>
+    /// Sends a message to a chat.
+    /// </summary>
+    public sealed record SendMessage(ChatId ChatId, string Text) : ApiRequest<Message>("sendMessage")
+    {
+        public ParseMode? ParseMode { get; init; }
+        public MessageEntity[]? Entities { get; init; }
+        public LinkPreviewOptions? LinkPreviewOptions { get; init; }
+        public bool? DisableNotification { get; init; }
+        public bool? ProtectContent { get; init; }
+        public string? MessageEffectId { get; init; }
+        /// <summary>
+        /// Description of the message to reply to.
+        /// </summary>
+        /// <remarks>
+        /// The original message will be quoted.
+        /// </remarks>
+        public ReplyParameters? ReplyParameters { get; init; }
+        public ReplyMarkup? ReplyMarkup { get; init; }
+    }
+
+    public static Task<Message> SendMessageAsync(this IBot bot, ChatId chatId, string text, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendMessage(chatId, text), cancellationToken);
+    }
+
+    public static Task<Message> SendMessageAsync(this IBot bot, ChatId chatId, string text, ReplyMarkup replyMarkup, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendMessage(chatId, text) { ReplyMarkup = replyMarkup }, cancellationToken);
+    }
+
+    public sealed record SetMyCommands(BotCommand[] Commands) : ApiRequest<bool>("setMyCommands")
+    {
+        public BotCommandScope? Scope { get; init; }
+        public string? LanguageCode { get; init; }
+    }
+
+    public static Task<bool> SetMyCommandsAsync(this IBot bot, BotCommand[] commands, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SetMyCommands(commands) { Scope = new(BotCommandScopeType.Default) }, cancellationToken);
+    }
+
+    public sealed record AnswerCallbackQuery(string CallbackQueryId) : ApiRequest<bool>("answerCallbackQuery")
+    {
+        public string? Text { get; init; }
+        public bool ShowAlert { get; init; }
+        public bool? Url { get; init; }
+        public int CacheTime { get; init; }
+    }
+
+    public static Task<bool> AnswerCallbackQueryAsync(this IBot bot, string callbackQueryId, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new AnswerCallbackQuery(callbackQueryId), cancellationToken);
+    }
 }

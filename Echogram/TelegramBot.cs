@@ -92,7 +92,7 @@ public sealed class TelegramBot : IBot
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, enumeratorCancellationToken);
 
-        var updateRequest = new ApiGetUpdates { Offset = 0 };
+        var updateRequest = new Api.GetUpdates { Offset = 0 };
         while (true)
         {
             cts.Token.ThrowIfCancellationRequested();
