@@ -86,14 +86,14 @@ class Program
         // bot API client
         var botToken = configuration.GetConnectionString("DefaultConnection") ??
             throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-        services.AddHttpClient<TelegramBot, TelegramBot>((http, sp) =>
+        services.AddHttpClient<IBot, TelegramBot>((http, sp) =>
         {
             http.BaseAddress = new Uri("https://api.telegram.org/");
             var logging = sp.GetRequiredService<ILoggerFactory>();
             return new TelegramBot(botToken, http, logging.CreateLogger<TelegramBot>());
         });
 
-        services.AddSingleton(EchoBotDialog.Factory);
+        services.AddSingleton(EchoBotDialog.Forum);
         services.AddSingleton<BotOperator<EchoBotDialog>>();
 
         return services.BuildServiceProvider();

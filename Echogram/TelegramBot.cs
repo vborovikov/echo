@@ -74,8 +74,11 @@ public sealed class TelegramBot : IBot
 
         return response.Result;
     }
+}
 
-    public async IAsyncEnumerable<Update> GetAllUpdatesAsync(CancellationToken cancellationToken, [EnumeratorCancellation] CancellationToken enumeratorCancellationToken = default)
+static class TelegramBotExtensions
+{
+    public static async IAsyncEnumerable<Update> GetAllUpdatesAsync(this IBot bot, CancellationToken cancellationToken, [EnumeratorCancellation] CancellationToken enumeratorCancellationToken = default)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, enumeratorCancellationToken);
 
@@ -87,8 +90,7 @@ public sealed class TelegramBot : IBot
             var updates = Array.Empty<Update>();
             try
             {
-                this.log.LogTrace(EventIds.BotWaiting, "Waiting for updates");
-                updates = await ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
+                updates = await bot.ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -97,8 +99,6 @@ public sealed class TelegramBot : IBot
 
             if (updates.Length > 0)
             {
-                this.log.LogTrace(EventIds.BotWaiting, "Received {Count} updates", updates.Length);
-
                 var offset = 0;
                 foreach (var update in updates)
                 {

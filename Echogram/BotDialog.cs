@@ -9,7 +9,7 @@ using Telegram;
 /// Produces new bot dialogs.
 /// </summary>
 /// <typeparam name="TBotDialog">The concrete type of the bot dialog.</typeparam>
-public interface IBotDialogFactory<TBotDialog> where TBotDialog : IBotDialog<TBotDialog>
+public interface IBotForum<TBotDialog> where TBotDialog : IBotDialog<TBotDialog>
 {
     /// <summary>
     /// Creates a new bot dialog.

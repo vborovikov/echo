@@ -26,15 +26,15 @@ public interface IBotOperator<TBotDialog> : IBotOperator
 public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     where TBotDialog : IBotDialog<TBotDialog>
 {
-    private readonly IBotDialogFactory<TBotDialog> factory;
-    private readonly TelegramBot bot;
+    private readonly IBot bot;
+    private readonly IBotForum<TBotDialog> forum;
     private readonly ILogger<BotOperator<TBotDialog>> log;
     private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
 
-    public BotOperator(IBotDialogFactory<TBotDialog> factory, TelegramBot bot, ILogger<BotOperator<TBotDialog>> logger)
+    public BotOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotOperator<TBotDialog>> logger)
     {
-        this.factory = factory;
         this.bot = bot;
+        this.forum = forum;
         this.log = logger;
         this.dialogs = new();
     }
@@ -208,6 +208,6 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
 
         maybeNew = true;
-        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.factory.Create(botOperator, chatId), this);
+        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.forum.Create(botOperator, chatId), this);
     }
 }
