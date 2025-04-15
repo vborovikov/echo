@@ -1,8 +1,5 @@
-#undef DUMP_JSON
-
 namespace Echo;
 
-using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
@@ -56,10 +53,6 @@ public sealed class TelegramBot : IBot
     {
         ArgumentNullException.ThrowIfNull(request);
 
-#if DUMP_JSON
-        Debug.WriteLine(JsonSerializer.Serialize(request, request.GetType(), jsonOptions));
-#endif
-
         this.log.LogTrace(EventIds.BotExecuting, "Executing Bot API request '{Method}'", request.Method);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri($"/bot{this.token}/{request.Method}", UriKind.Relative))
@@ -69,16 +62,10 @@ public sealed class TelegramBot : IBot
         using var httpResponse = await this.http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
 
-#if DUMP_JSON
-        var httpContent = await httpResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        Debug.WriteLine(httpContent);
-        var response = JsonSerializer.Deserialize<ApiResponse<TResult>>(httpContent, jsonOptions) ??
-            throw new TelegramBotException(request.Method, default, $"Failed to execute Bot API request {request.Method}: empty response.");
-#else
         await using var httpContent = await httpResponse.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         var response = await JsonSerializer.DeserializeAsync<ApiResponse<TResult>>(httpContent, jsonOptions, cancellationToken).ConfigureAwait(false) ??
             throw new TelegramBotException(request.Method, default, $"Failed to execute Bot API request {request.Method}: empty response.");
-#endif
+
         if (!response.Ok || response.Result is null)
         {
             throw new TelegramBotException(request.Method, response,
@@ -100,7 +87,7 @@ public sealed class TelegramBot : IBot
             var updates = Array.Empty<Update>();
             try
             {
-                this.log.LogDebug(EventIds.BotWaiting, "Waiting for updates");
+                this.log.LogTrace(EventIds.BotWaiting, "Waiting for updates");
                 updates = await ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
