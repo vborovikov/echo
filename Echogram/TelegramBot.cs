@@ -14,6 +14,12 @@ using Telegram.Serialization;
 /// </summary>
 public interface IBot
 {
+    /// <summary>
+    /// Executes a request to the Telegram Bot API.
+    /// </summary>
+    /// <param name="request">The request to execute.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task that completes when the request is executed.</returns>
     Task<TResult> ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken);
 }
 
@@ -39,6 +45,12 @@ public sealed class TelegramBot : IBot
     private readonly HttpClient http;
     private readonly ILogger<TelegramBot> log;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TelegramBot"/> class.
+    /// </summary>
+    /// <param name="token">The bot token.</param>
+    /// <param name="http">The HTTP client.</param>
+    /// <param name="logger">The logger.</param>
     public TelegramBot(string token, HttpClient http, ILogger<TelegramBot> logger)
     {
         ArgumentNullException.ThrowIfNull(http);
@@ -49,6 +61,14 @@ public sealed class TelegramBot : IBot
         this.log = logger;
     }
 
+    /// <summary>
+    /// Executes a request to the Telegram Bot API.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the result.</typeparam>
+    /// <param name="request">The request to execute.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task that completes when the request is executed.</returns>
+    /// <exception cref="TelegramBotException">Throws if the request fails.</exception>
     public async Task<TResult> ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

@@ -11,12 +11,27 @@ using Telegram;
 /// </summary>
 public interface IBotOperator : IBot
 {
+    /// <summary>
+    /// Stops the bot conversation with the user.
+    /// </summary>
+    /// <param name="dialog">The dialog to stop.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task that completes when the dialog is stopped.</returns>
     Task StopAsync(IBotDialog dialog, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Operates the typed bot dialogs.
+/// </summary>
 public interface IBotOperator<TBotDialog> : IBotOperator
     where TBotDialog : IBotDialog<TBotDialog>
 {
+    /// <summary>
+    /// Starts the bot conversation with the user.
+    /// </summary>
+    /// <param name="chatId">The chat ID.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task that completes when the dialog is started.</returns>
     Task<TBotDialog> StartAsync(ChatId chatId, CancellationToken cancellationToken);
 }
 
@@ -31,6 +46,12 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     private readonly ILogger<BotOperator<TBotDialog>> log;
     private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BotOperator{TBotDialog}"/> class.
+    /// </summary>
+    /// <param name="bot">The bot to operate.</param>
+    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
+    /// <param name="logger">The logger.</param>
     public BotOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotOperator<TBotDialog>> logger)
     {
         this.bot = bot;
@@ -62,6 +83,11 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
     }
 
+    /// <summary>
+    /// Runs the bot operation.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task representing the asynchronous bot operation.</returns>
     public async Task ChatAsync(CancellationToken cancellationToken)
     {
         try
