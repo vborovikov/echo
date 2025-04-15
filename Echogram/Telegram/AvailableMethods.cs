@@ -75,6 +75,11 @@ public record InlineKeyboardMarkup(InlineKeyboardButton[][] InlineKeyboard) : Re
 
 public record InlineKeyboardButton(string Text)
 {
+    public InlineKeyboardButton(string text, string callbackData) : this(text)
+    {
+        this.CallbackData = callbackData;
+    }
+
     public string? Url { get; init; }
     public string CallbackData { get; init; } = Text;
     public CopyTextButton? CopyText { get; init; }
@@ -158,4 +163,12 @@ public sealed record ApiSetMyCommands(BotCommand[] Commands) : ApiRequest<bool>(
 {
     public BotCommandScope? Scope { get; init; }
     public string? LanguageCode { get; init; }
+}
+
+public sealed record ApiAnswerCallbackQuery(string CallbackQueryId) : ApiRequest<bool>("answerCallbackQuery")
+{
+    public string? Text { get; init; }
+    public bool ShowAlert { get; init; }
+    public bool? Url { get; init; }
+    public int CacheTime { get; init; }
 }
