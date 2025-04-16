@@ -60,6 +60,17 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         this.dialogs = new();
     }
 
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        foreach (var (_, dialog) in this.dialogs)
+        {
+            dialog.Dispose();
+        }
+        this.dialogs.Clear();
+        this.bot.Dispose();
+    }
+
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
 
@@ -68,7 +79,7 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         var dialog = GetDialog(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await dialog.BeginAsync(cancellationToken).ConfigureAwait(false);
+            await dialog.BeginAsync(isFriendly: false, cancellationToken).ConfigureAwait(false);
         }
 
         return dialog;
@@ -78,7 +89,7 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     {
         if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
         {
-            await removedDialog.EndAsync(cancellationToken).ConfigureAwait(false);
+            await removedDialog.EndAsync(isFriendly: true, cancellationToken).ConfigureAwait(false);
             removedDialog.Dispose();
         }
     }
@@ -115,9 +126,8 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         {
             foreach (var (_, dialog) in this.dialogs)
             {
-                await dialog.EndAsync(default).ConfigureAwait(false);
+                await dialog.EndAsync(isFriendly: false, default).ConfigureAwait(false);
             }
-            this.dialogs.Clear();
 
             throw;
         }
@@ -181,7 +191,7 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
                     {
                         if (maybeNew)
                         {
-                            await dialog.BeginAsync(cancellationToken).ConfigureAwait(false);
+                            await dialog.BeginAsync(isFriendly: true, cancellationToken).ConfigureAwait(false);
                         }
                         await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }

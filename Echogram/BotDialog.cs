@@ -33,16 +33,18 @@ public interface IBotDialog : IDisposable
     /// <summary>
     /// Begins the bot dialog.
     /// </summary>
+    /// <param name="isFriendly">Indicates whether the bot should be verbose or not.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task BeginAsync(CancellationToken cancellationToken);
+    Task BeginAsync(bool isFriendly, CancellationToken cancellationToken);
 
     /// <summary>
     /// Ends the bot dialog.
     /// </summary>
+    /// <param name="isFriendly">Indicates whether the bot should be verbose or not.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    Task EndAsync(CancellationToken cancellationToken);
+    Task EndAsync(bool isFriendly, CancellationToken cancellationToken);
 
     /// <summary>
     /// Handles an incoming chat message.

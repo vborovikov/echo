@@ -12,7 +12,7 @@ using Telegram.Serialization;
 /// <summary>
 /// Provides access to the Telegram Bot API.
 /// </summary>
-public interface IBot
+public interface IBot : IDisposable
 {
     /// <summary>
     /// Executes a request to the Telegram Bot API.
@@ -59,6 +59,12 @@ public sealed class TelegramBot : IBot
         this.token = token;
         this.http = http;
         this.log = logger;
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        this.http.Dispose();
     }
 
     /// <summary>
