@@ -187,16 +187,39 @@ public static class Api
         return bot.ExecuteAsync(new SetMyCommands(commands) { Scope = new(BotCommandScopeType.Default) }, cancellationToken);
     }
 
+    /// <summary>
+    /// Sends answers to callback queries sent from inline keyboards.
+    /// </summary>
+    /// <remarks>The answer will be displayed to the user as a notification at the top of the chat screen or as an alert.</remarks>
+    /// <param name="CallbackQueryId">Unique identifier for the query to be answered.</param>
     public sealed record AnswerCallbackQuery(string CallbackQueryId) : ApiRequest<bool>("answerCallbackQuery")
     {
+        /// <summary>
+        /// Text of the notification. If not specified, nothing will be shown to the user, 0-200 characters.
+        /// </summary>
         public string? Text { get; init; }
+        /// <summary>
+        /// If True, an alert will be shown by the client instead of a notification at the top of the chat screen.
+        /// </summary>
         public bool ShowAlert { get; init; }
+        /// <summary>
+        /// URL that will be opened by the user's client.
+        /// </summary>
         public bool? Url { get; init; }
+        /// <summary>
+        /// The maximum amount of time in seconds that the result of the callback query may be cached client-side. 
+        /// Telegram apps will support caching starting in version 3.14. Defaults to 0.
+        /// </summary>
         public int CacheTime { get; init; }
     }
 
     public static Task<bool> AnswerCallbackQueryAsync(this IBot bot, string callbackQueryId, CancellationToken cancellationToken)
     {
         return bot.ExecuteAsync(new AnswerCallbackQuery(callbackQueryId), cancellationToken);
+    }
+
+    public static Task<bool> AnswerCallbackQueryAsync(this IBot bot, string callbackQueryId, string text, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new AnswerCallbackQuery(callbackQueryId) { Text = text, ShowAlert = false }, cancellationToken);
     }
 }
