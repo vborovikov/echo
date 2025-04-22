@@ -38,24 +38,21 @@ public interface IBotOperator<TBotDialog> : IBotOperator
 /// <summary>
 /// Operates the bot dialogs.
 /// </summary>
-public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
+public abstract class BotOperatorBase<TBotDialog> : IBotOperator<TBotDialog>
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBot bot;
-    private readonly IBotForum<TBotDialog> forum;
-    private readonly ILogger<BotOperator<TBotDialog>> log;
+    private readonly ILogger log;
     private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BotOperator{TBotDialog}"/> class.
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
-    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
     /// <param name="logger">The logger.</param>
-    public BotOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotOperator<TBotDialog>> logger)
+    protected BotOperatorBase(IBot bot, ILogger logger)
     {
         this.bot = bot;
-        this.forum = forum;
         this.log = logger;
         this.dialogs = new();
     }
@@ -244,6 +241,36 @@ public class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
 
         maybeNew = true;
-        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.forum.Create(botOperator, chatId), this);
+        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.CreateDialog(chatId), this);
     }
+
+    /// <summary>
+    /// Creates a new bot dialog.
+    /// </summary>
+    /// <param name="chatId">The unique identifier of the chat.</param>
+    /// <returns>A new bot dialog.</returns>
+    protected abstract TBotDialog CreateDialog(ChatId chatId);
+}
+
+/// <summary>
+/// Operates the bot dialogs.
+/// </summary>
+public class BotOperator<TBotDialog> : BotOperatorBase<TBotDialog>
+    where TBotDialog : IBotDialog<TBotDialog>
+{
+    private readonly IBotForum<TBotDialog> forum;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BotOperator{TBotDialog}"/> class.
+    /// </summary>
+    /// <param name="bot">The bot to operate.</param>
+    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
+    /// <param name="logger">The logger.</param>
+    public BotOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotOperator<TBotDialog>> logger) : base(bot, logger)
+    {
+        this.forum = forum;
+    }
+
+    /// <inheritdoc/>
+    protected override TBotDialog CreateDialog(ChatId chatId) => this.forum.Create(this, chatId);
 }
