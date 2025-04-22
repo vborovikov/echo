@@ -38,7 +38,7 @@ public interface IBotOperator<TBotDialog> : IBotOperator
 /// <summary>
 /// Operates the bot dialogs.
 /// </summary>
-public abstract class BotOperatorBase<TBotDialog> : IBotOperator<TBotDialog>
+public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBot bot;
@@ -50,7 +50,7 @@ public abstract class BotOperatorBase<TBotDialog> : IBotOperator<TBotDialog>
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
     /// <param name="logger">The logger.</param>
-    protected BotOperatorBase(IBot bot, ILogger logger)
+    protected BotOperator(IBot bot, ILogger logger)
     {
         this.bot = bot;
         this.log = logger;
@@ -255,21 +255,30 @@ public abstract class BotOperatorBase<TBotDialog> : IBotOperator<TBotDialog>
 /// <summary>
 /// Operates the bot dialogs.
 /// </summary>
-public class BotOperator<TBotDialog> : BotOperatorBase<TBotDialog>
+public class BotForumOperator<TBotDialog> : BotOperator<TBotDialog>
     where TBotDialog : IBotDialog<TBotDialog>
 {
     private readonly IBotForum<TBotDialog> forum;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BotOperator{TBotDialog}"/> class.
+    /// Initializes a new instance of the <see cref="BotForumOperator{TBotDialog}"/> class.
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
     /// <param name="forum">The forum (a factory object) to create dialogs.</param>
     /// <param name="logger">The logger.</param>
-    public BotOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotOperator<TBotDialog>> logger) : base(bot, logger)
+    public BotForumOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger logger) : base(bot, logger)
     {
         this.forum = forum;
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BotForumOperator{TBotDialog}"/> class.
+    /// </summary>
+    /// <param name="bot">The bot to operate.</param>
+    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
+    /// <param name="logger">The logger.</param>
+    public BotForumOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotForumOperator<TBotDialog>> logger)
+        : this(bot, forum, (ILogger)logger) { }
 
     /// <inheritdoc/>
     protected override TBotDialog CreateDialog(ChatId chatId) => this.forum.Create(this, chatId);

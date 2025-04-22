@@ -38,7 +38,7 @@ class Program
         try
         {
             await using var sp = ConfigureApp(args);
-            var bot = sp.GetRequiredService<BotOperator<EchoBotDialog>>();
+            var bot = sp.GetRequiredService<BotForumOperator<EchoBotDialog>>();
 
             Console.Error.WriteLine("Bot started chatting.");
             await bot.ChatAsync(cts.Token);
@@ -94,7 +94,7 @@ class Program
         });
 
         services.AddSingleton(EchoBotDialog.Forum);
-        services.AddSingleton<BotOperator<EchoBotDialog>>();
+        services.AddSingleton<BotForumOperator<EchoBotDialog>>();
 
         return services.BuildServiceProvider();
     }
