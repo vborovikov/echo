@@ -76,7 +76,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         var dialog = GetDialog(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await dialog.BeginAsync(isFriendly: false, cancellationToken).ConfigureAwait(false);
+            await dialog.BeginAsync(isFriendly: false, default, cancellationToken).ConfigureAwait(false);
         }
 
         return dialog;
@@ -188,7 +188,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
                     {
                         if (maybeNew)
                         {
-                            await dialog.BeginAsync(isFriendly: true, cancellationToken).ConfigureAwait(false);
+                            await dialog.BeginAsync(isFriendly: true, message.From, cancellationToken).ConfigureAwait(false);
                         }
                         await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }
