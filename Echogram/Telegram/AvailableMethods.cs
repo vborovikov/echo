@@ -171,6 +171,11 @@ public static class Api
         return bot.ExecuteAsync(new SendMessage(chatId, text), cancellationToken);
     }
 
+    public static Task<Message> SendMessageAsync(this IBot bot, ChatId chatId, string text, ParseMode parseMode, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendMessage(chatId, text) { ParseMode = parseMode }, cancellationToken);
+    }
+
     public static Task<Message> SendMessageAsync(this IBot bot, ChatId chatId, string text, ReplyMarkup replyMarkup, CancellationToken cancellationToken)
     {
         return bot.ExecuteAsync(new SendMessage(chatId, text) { ReplyMarkup = replyMarkup }, cancellationToken);
