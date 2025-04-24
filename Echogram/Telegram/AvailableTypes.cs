@@ -539,7 +539,7 @@ public enum MessageEntityType
     Strikethrough,
     Spoiler,
     Blockquote,
-    ExpandedBlockquote,
+    ExpandableBlockquote,
     Code,
     Pre,
     TextLink,
