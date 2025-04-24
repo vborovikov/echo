@@ -15,9 +15,10 @@ public interface IBotOperator : IBot
     /// Stops the bot conversation with the user.
     /// </summary>
     /// <param name="dialog">The dialog to stop.</param>
+    /// <param name="user">The user who decided to stop the dialog, or <c>null</c> if the dialog was forced to stop.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A task that completes when the dialog is stopped.</returns>
-    Task StopAsync(IBotDialog dialog, CancellationToken cancellationToken);
+    Task StopAsync(IBotDialog dialog, User? user, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -76,17 +77,17 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         var dialog = GetDialog(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await dialog.BeginAsync(isFriendly: false, default, cancellationToken).ConfigureAwait(false);
+            await dialog.BeginAsync(default, cancellationToken).ConfigureAwait(false);
         }
 
         return dialog;
     }
 
-    async Task IBotOperator.StopAsync(IBotDialog dialog, CancellationToken cancellationToken)
+    async Task IBotOperator.StopAsync(IBotDialog dialog, User? user, CancellationToken cancellationToken)
     {
         if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
         {
-            await removedDialog.EndAsync(isFriendly: true, cancellationToken).ConfigureAwait(false);
+            await removedDialog.EndAsync(user, cancellationToken).ConfigureAwait(false);
             removedDialog.Dispose();
         }
     }
@@ -123,7 +124,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         {
             foreach (var (_, dialog) in this.dialogs)
             {
-                await dialog.EndAsync(isFriendly: false, default).ConfigureAwait(false);
+                await dialog.EndAsync(default, default).ConfigureAwait(false);
             }
 
             throw;
@@ -188,7 +189,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
                     {
                         if (maybeNew)
                         {
-                            await dialog.BeginAsync(isFriendly: true, message.From, cancellationToken).ConfigureAwait(false);
+                            await dialog.BeginAsync(message.From, cancellationToken).ConfigureAwait(false);
                         }
                         await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }
