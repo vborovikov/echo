@@ -44,7 +44,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 {
     private readonly IBot bot;
     private readonly ILogger log;
-    private readonly ConcurrentDictionary<ChatId, TBotChat> chats;
+    private readonly ConcurrentDictionary<ChatId, ChatSession> chats;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BotOperator{TBotChat}"/> class.
@@ -61,9 +61,9 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     /// <inheritdoc/>
     public void Dispose()
     {
-        foreach (var (_, chat) in this.chats)
+        foreach (var (_, session) in this.chats)
         {
-            chat.Dispose();
+            session.Dispose();
         }
         this.chats.Clear();
         this.bot.Dispose();
@@ -74,21 +74,23 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 
     async Task<TBotChat> IBotOperator<TBotChat>.StartAsync(ChatId chatId, CancellationToken cancellationToken)
     {
-        var chat = GetChat(chatId, out var maybeNew);
+        var session = GetChatSession(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await chat.BeginAsync(default, cancellationToken).ConfigureAwait(false);
+            //todo: do we need here to care about the session lifetime?
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Lifetime);
+            await session.Chat.BeginAsync(default, cts.Token).ConfigureAwait(false);
         }
 
-        return chat;
+        return session.Chat;
     }
 
     async Task IBotOperator.StopAsync(IBotChat chat, User? user, CancellationToken cancellationToken)
     {
-        if (this.chats.TryRemove(chat.ChatId, out var removedChat))
+        if (this.chats.TryRemove(chat.ChatId, out var removedSession))
         {
-            await removedChat.EndAsync(user, cancellationToken).ConfigureAwait(false);
-            removedChat.Dispose();
+            await removedSession.StopAsync(user, cancellationToken).ConfigureAwait(false);
+            removedSession.Dispose();
         }
     }
 
@@ -122,10 +124,12 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         }
         catch (OperationCanceledException)
         {
-            foreach (var (_, chat) in this.chats)
+            foreach (var (_, session) in this.chats)
             {
-                await chat.EndAsync(default, default).ConfigureAwait(false);
+                await session.StopAsync().ConfigureAwait(false);
+                session.Dispose();
             }
+            this.chats.Clear();
 
             throw;
         }
@@ -184,19 +188,25 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             await Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (message, cancellationToken) =>
                 {
-                    var chat = GetChat(message.Chat.Id, out var maybeNew);
+                    var session = GetChatSession(message.Chat.Id, out var maybeNew);
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Lifetime);
                     try
                     {
                         if (maybeNew)
                         {
-                            await chat.BeginAsync(message.From, cancellationToken).ConfigureAwait(false);
+                            await session.Chat.BeginAsync(message.From, cts.Token).ConfigureAwait(false);
                         }
-                        await chat.HandleAsync(message, cancellationToken).ConfigureAwait(false);
+                        await session.Chat.HandleAsync(message, cts.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException x) when (cts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        this.log.LogWarning(EventIds.BotConfused, x, "Handling message {MessageId} from {ChatId} was taking too much time",
+                            message.MessageId, message.Chat.Id);
                     }
                     catch (Exception x) when (x is not OperationCanceledException)
                     {
-                        this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
-                        await chat.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                        this.log.LogError(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
+                        await session.Chat.HandleAsync(x, cts.Token).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
@@ -214,15 +224,21 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             await Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (callback, cancellationToken) =>
                 {
-                    var chat = GetChat((ChatId)callback.From.Id, out _);
+                    var session = GetChatSession((ChatId)callback.From.Id, out _);
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Lifetime);
                     try
                     {
-                        await chat.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
+                        await session.Chat.HandleAsync(callback, cts.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException x) when (cts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                    {
+                        this.log.LogWarning(EventIds.BotConfused, x, "Handling callback {CallbackId} from {UserId} was taking too much time",
+                            callback.Id, callback.From.Id);
                     }
                     catch (Exception x) when (x is not OperationCanceledException)
                     {
-                        this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
-                        await chat.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                        this.log.LogError(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
+                        await session.Chat.HandleAsync(x, cts.Token).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
@@ -233,16 +249,16 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         }
     }
 
-    private TBotChat GetChat(ChatId chatId, out bool maybeNew)
+    private ChatSession GetChatSession(ChatId chatId, out bool maybeNew)
     {
-        if (this.chats.TryGetValue(chatId, out var chat))
+        if (this.chats.TryGetValue(chatId, out var session))
         {
             maybeNew = false;
-            return chat;
+            return session;
         }
 
         maybeNew = true;
-        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => botOperator.CreateChat(chatId), this);
+        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => new ChatSession(botOperator.CreateChat(chatId)), this);
     }
 
     /// <summary>
@@ -251,6 +267,57 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     /// <param name="chatId">The unique identifier of the chat.</param>
     /// <returns>A new bot chat.</returns>
     protected abstract TBotChat CreateChat(ChatId chatId);
+
+    private sealed class ChatSession : IDisposable
+    {
+        private readonly CancellationTokenSource lifetime;
+        private bool isDisposed;
+
+        public ChatSession(TBotChat chat)
+        {
+            this.Chat = chat;
+            this.lifetime = new CancellationTokenSource();
+        }
+
+        public TBotChat Chat { get; }
+
+        public CancellationToken Lifetime => this.lifetime.Token;
+
+        public async Task StopAsync(User? user = default, CancellationToken cancellationToken = default)
+        {
+            await this.Chat.EndAsync(user, cancellationToken).ConfigureAwait(false);
+
+            // the provided cancellation token can be linked with the lifetime token
+            // cancel the lifetime last
+            await this.lifetime.CancelAsync().ConfigureAwait(false);
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (!this.isDisposed)
+            {
+                if (disposing)
+                {
+                    if (!this.lifetime.IsCancellationRequested)
+                    {
+                        this.lifetime.Cancel();
+                    }
+
+                    this.Chat.Dispose();
+                    this.lifetime.Dispose();
+                }
+
+                this.isDisposed = true;
+            }
+        }
+    }
 }
 
 /// <summary>
