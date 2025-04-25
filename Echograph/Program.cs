@@ -38,7 +38,7 @@ class Program
         try
         {
             await using var sp = ConfigureApp(args);
-            var bot = sp.GetRequiredService<BotForumOperator<EchoBotDialog>>();
+            var bot = sp.GetRequiredService<BotForumOperator<EchoBotChat>>();
 
             Console.Error.WriteLine("Bot started chatting.");
             await bot.ChatAsync(cts.Token);
@@ -93,8 +93,8 @@ class Program
             return new TelegramBot(botToken, http, logging.CreateLogger<TelegramBot>());
         });
 
-        services.AddSingleton(EchoBotDialog.Forum);
-        services.AddSingleton<BotForumOperator<EchoBotDialog>>();
+        services.AddSingleton(EchoBotChat.Forum);
+        services.AddSingleton<BotForumOperator<EchoBotChat>>();
 
         return services.BuildServiceProvider();
     }

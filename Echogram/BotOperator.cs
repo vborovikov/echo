@@ -7,47 +7,47 @@ using Microsoft.Extensions.Logging;
 using Telegram;
 
 /// <summary>
-/// Operates the bot dialogs.
+/// Operates the bot chats.
 /// </summary>
 public interface IBotOperator : IBot
 {
     /// <summary>
     /// Stops the bot conversation with the user.
     /// </summary>
-    /// <param name="dialog">The dialog to stop.</param>
-    /// <param name="user">The user who decided to stop the dialog, or <c>null</c> if the dialog was forced to stop.</param>
+    /// <param name="chat">The chat to stop.</param>
+    /// <param name="user">The user who decided to stop the chat, or <c>null</c> if the chat was forced to stop.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    /// <returns>A task that completes when the dialog is stopped.</returns>
-    Task StopAsync(IBotDialog dialog, User? user, CancellationToken cancellationToken);
+    /// <returns>A task that completes when the chat is stopped.</returns>
+    Task StopAsync(IBotChat chat, User? user, CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Operates the typed bot dialogs.
+/// Operates the typed bot chats.
 /// </summary>
-public interface IBotOperator<TBotDialog> : IBotOperator
-    where TBotDialog : IBotDialog<TBotDialog>
+public interface IBotOperator<TBotChat> : IBotOperator
+    where TBotChat : IBotChat<TBotChat>
 {
     /// <summary>
     /// Starts the bot conversation with the user.
     /// </summary>
     /// <param name="chatId">The chat ID.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    /// <returns>A task that completes when the dialog is started.</returns>
-    Task<TBotDialog> StartAsync(ChatId chatId, CancellationToken cancellationToken);
+    /// <returns>A task that completes when the chat is started.</returns>
+    Task<TBotChat> StartAsync(ChatId chatId, CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// Operates the bot dialogs.
+/// Operates the bot chats.
 /// </summary>
-public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
-    where TBotDialog : IBotDialog<TBotDialog>
+public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
+    where TBotChat : IBotChat<TBotChat>
 {
     private readonly IBot bot;
     private readonly ILogger log;
-    private readonly ConcurrentDictionary<ChatId, TBotDialog> dialogs;
+    private readonly ConcurrentDictionary<ChatId, TBotChat> chats;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BotOperator{TBotDialog}"/> class.
+    /// Initializes a new instance of the <see cref="BotOperator{TBotChat}"/> class.
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
     /// <param name="logger">The logger.</param>
@@ -55,40 +55,40 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     {
         this.bot = bot;
         this.log = logger;
-        this.dialogs = new();
+        this.chats = new();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        foreach (var (_, dialog) in this.dialogs)
+        foreach (var (_, chat) in this.chats)
         {
-            dialog.Dispose();
+            chat.Dispose();
         }
-        this.dialogs.Clear();
+        this.chats.Clear();
         this.bot.Dispose();
     }
 
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
 
-    async Task<TBotDialog> IBotOperator<TBotDialog>.StartAsync(ChatId chatId, CancellationToken cancellationToken)
+    async Task<TBotChat> IBotOperator<TBotChat>.StartAsync(ChatId chatId, CancellationToken cancellationToken)
     {
-        var dialog = GetDialog(chatId, out var maybeNew);
+        var chat = GetChat(chatId, out var maybeNew);
         if (maybeNew)
         {
-            await dialog.BeginAsync(default, cancellationToken).ConfigureAwait(false);
+            await chat.BeginAsync(default, cancellationToken).ConfigureAwait(false);
         }
 
-        return dialog;
+        return chat;
     }
 
-    async Task IBotOperator.StopAsync(IBotDialog dialog, User? user, CancellationToken cancellationToken)
+    async Task IBotOperator.StopAsync(IBotChat chat, User? user, CancellationToken cancellationToken)
     {
-        if (this.dialogs.TryRemove(dialog.ChatId, out var removedDialog))
+        if (this.chats.TryRemove(chat.ChatId, out var removedChat))
         {
-            await removedDialog.EndAsync(user, cancellationToken).ConfigureAwait(false);
-            removedDialog.Dispose();
+            await removedChat.EndAsync(user, cancellationToken).ConfigureAwait(false);
+            removedChat.Dispose();
         }
     }
 
@@ -101,7 +101,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
     {
         try
         {
-            await TBotDialog.StartAsync(this, cancellationToken).ConfigureAwait(false);
+            await TBotChat.StartAsync(this, cancellationToken).ConfigureAwait(false);
             this.log.LogInformation(EventIds.BotStarted, "Bot operation started");
 
             var messageChannel = Channel.CreateUnbounded<Message>(new()
@@ -122,9 +122,9 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
         catch (OperationCanceledException)
         {
-            foreach (var (_, dialog) in this.dialogs)
+            foreach (var (_, chat) in this.chats)
             {
-                await dialog.EndAsync(default, default).ConfigureAwait(false);
+                await chat.EndAsync(default, default).ConfigureAwait(false);
             }
 
             throw;
@@ -135,7 +135,7 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
         finally
         {
-            await TBotDialog.StopAsync(this, default).ConfigureAwait(false);
+            await TBotChat.StopAsync(this, default).ConfigureAwait(false);
             this.log.LogInformation(EventIds.BotStopped, "Bot operation stopped");
         }
     }
@@ -184,19 +184,19 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
             await Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (message, cancellationToken) =>
                 {
-                    var dialog = GetDialog(message.Chat.Id, out var maybeNew);
+                    var chat = GetChat(message.Chat.Id, out var maybeNew);
                     try
                     {
                         if (maybeNew)
                         {
-                            await dialog.BeginAsync(message.From, cancellationToken).ConfigureAwait(false);
+                            await chat.BeginAsync(message.From, cancellationToken).ConfigureAwait(false);
                         }
-                        await dialog.HandleAsync(message, cancellationToken).ConfigureAwait(false);
+                        await chat.HandleAsync(message, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception x) when (x is not OperationCanceledException)
                     {
                         this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle message {MessageId} from {ChatId}", message.MessageId, message.Chat.Id);
-                        await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                        await chat.HandleAsync(x, cancellationToken).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
@@ -214,15 +214,15 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
             await Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
                 async (callback, cancellationToken) =>
                 {
-                    var dialog = GetDialog((ChatId)callback.From.Id, out _);
+                    var chat = GetChat((ChatId)callback.From.Id, out _);
                     try
                     {
-                        await dialog.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
+                        await chat.HandleAsync(callback, cancellationToken).ConfigureAwait(false);
                     }
                     catch (Exception x) when (x is not OperationCanceledException)
                     {
                         this.log.LogWarning(EventIds.BotConfused, x, "Failed to handle callback {CallbackId} from {UserId}", callback.Id, callback.From.Id);
-                        await dialog.HandleAsync(x, cancellationToken).ConfigureAwait(false);
+                        await chat.HandleAsync(x, cancellationToken).ConfigureAwait(false);
                     }
                 }).ConfigureAwait(false);
         }
@@ -233,54 +233,54 @@ public abstract class BotOperator<TBotDialog> : IBotOperator<TBotDialog>
         }
     }
 
-    private TBotDialog GetDialog(ChatId chatId, out bool maybeNew)
+    private TBotChat GetChat(ChatId chatId, out bool maybeNew)
     {
-        if (this.dialogs.TryGetValue(chatId, out var dialog))
+        if (this.chats.TryGetValue(chatId, out var chat))
         {
             maybeNew = false;
-            return dialog;
+            return chat;
         }
 
         maybeNew = true;
-        return this.dialogs.GetOrAdd(chatId, (chatId, botOperator) => botOperator.CreateDialog(chatId), this);
+        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => botOperator.CreateChat(chatId), this);
     }
 
     /// <summary>
-    /// Creates a new bot dialog.
+    /// Creates a new bot chat.
     /// </summary>
     /// <param name="chatId">The unique identifier of the chat.</param>
-    /// <returns>A new bot dialog.</returns>
-    protected abstract TBotDialog CreateDialog(ChatId chatId);
+    /// <returns>A new bot chat.</returns>
+    protected abstract TBotChat CreateChat(ChatId chatId);
 }
 
 /// <summary>
-/// Operates the bot dialogs.
+/// Operates the bot chats.
 /// </summary>
-public class BotForumOperator<TBotDialog> : BotOperator<TBotDialog>
-    where TBotDialog : IBotDialog<TBotDialog>
+public class BotForumOperator<TBotChat> : BotOperator<TBotChat>
+    where TBotChat : IBotChat<TBotChat>
 {
-    private readonly IBotForum<TBotDialog> forum;
+    private readonly IBotForum<TBotChat> forum;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BotForumOperator{TBotDialog}"/> class.
+    /// Initializes a new instance of the <see cref="BotForumOperator{TBotChat}"/> class.
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
-    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
+    /// <param name="forum">The forum (a factory object) to create chats.</param>
     /// <param name="logger">The logger.</param>
-    public BotForumOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger logger) : base(bot, logger)
+    public BotForumOperator(IBot bot, IBotForum<TBotChat> forum, ILogger logger) : base(bot, logger)
     {
         this.forum = forum;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="BotForumOperator{TBotDialog}"/> class.
+    /// Initializes a new instance of the <see cref="BotForumOperator{TBotChat}"/> class.
     /// </summary>
     /// <param name="bot">The bot to operate.</param>
-    /// <param name="forum">The forum (a factory object) to create dialogs.</param>
+    /// <param name="forum">The forum (a factory object) to create chats.</param>
     /// <param name="logger">The logger.</param>
-    public BotForumOperator(IBot bot, IBotForum<TBotDialog> forum, ILogger<BotForumOperator<TBotDialog>> logger)
+    public BotForumOperator(IBot bot, IBotForum<TBotChat> forum, ILogger<BotForumOperator<TBotChat>> logger)
         : this(bot, forum, (ILogger)logger) { }
 
     /// <inheritdoc/>
-    protected override TBotDialog CreateDialog(ChatId chatId) => this.forum.Create(this, chatId);
+    protected override TBotChat CreateChat(ChatId chatId) => this.forum.Create(this, chatId);
 }

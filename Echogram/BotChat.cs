@@ -6,24 +6,24 @@ using System.Threading.Tasks;
 using Telegram;
 
 /// <summary>
-/// Produces new bot dialogs.
+/// Produces new bot chats.
 /// </summary>
-/// <typeparam name="TBotDialog">The concrete type of the bot dialog.</typeparam>
-public interface IBotForum<TBotDialog> where TBotDialog : IBotDialog<TBotDialog>
+/// <typeparam name="TBotChat">The concrete type of the bot chat.</typeparam>
+public interface IBotForum<TBotChat> where TBotChat : IBotChat<TBotChat>
 {
     /// <summary>
-    /// Creates a new bot dialog.
+    /// Creates a new bot chat.
     /// </summary>
     /// <param name="bot">The bot operator.</param>
     /// <param name="chatId">The unique identifier of the chat.</param>
-    /// <returns>A new bot dialog.</returns>
-    public TBotDialog Create(IBotOperator bot, ChatId chatId);
+    /// <returns>A new bot chat.</returns>
+    public TBotChat Create(IBotOperator bot, ChatId chatId);
 }
 
 /// <summary>
-/// Represents a bot dialog with a user in a specific chat.
+/// Represents the bot interaction with a user in a specific chat.
 /// </summary>
-public interface IBotDialog : IDisposable
+public interface IBotChat : IDisposable
 {
     /// <summary>
     /// The unique identifier of the chat.
@@ -31,17 +31,17 @@ public interface IBotDialog : IDisposable
     ChatId ChatId { get; }
 
     /// <summary>
-    /// Begins the bot dialog.
+    /// Begins the bot interaction with a user.
     /// </summary>
-    /// <param name="user">The user who begun the dialog, or <c>null</c> if the dialog was begun by the bot.</param>
+    /// <param name="user">The user who begun the chat, or <c>null</c> if the chat was begun by the bot.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task BeginAsync(User? user, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Ends the bot dialog.
+    /// Ends the bot interaction with a user.
     /// </summary>
-    /// <param name="user">The user who is ending the dialog, or <c>null</c> if the dialog was forced to stop.</param>
+    /// <param name="user">The user who is ending the chat, or <c>null</c> if the chat was forced to end.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
     Task EndAsync(User? user, CancellationToken cancellationToken);
@@ -72,11 +72,11 @@ public interface IBotDialog : IDisposable
 }
 
 /// <summary>
-/// Defines the bot dialog general initialization and termination.
+/// Defines the bot general initialization and termination.
 /// </summary>
-/// <typeparam name="TSelf">The type that implements the bot dialog.</typeparam>
-public interface IBotDialog<TSelf> : IBotDialog
-    where TSelf : IBotDialog<TSelf>
+/// <typeparam name="TSelf">The type that implements the bot interaction.</typeparam>
+public interface IBotChat<TSelf> : IBotChat
+    where TSelf : IBotChat<TSelf>
 {
     /// <summary>
     /// Initializes the bot.
