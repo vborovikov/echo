@@ -90,7 +90,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         if (this.chats.TryRemove(chat.ChatId, out var removedSession))
         {
             await removedSession.StopAsync(user, cancellationToken).ConfigureAwait(false);
-            removedSession.Dispose();
+            await removedSession.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -127,7 +127,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             foreach (var (_, session) in this.chats)
             {
                 await session.StopAsync().ConfigureAwait(false);
-                session.Dispose();
+                await session.DisposeAsync().ConfigureAwait(false);
             }
             this.chats.Clear();
 
@@ -268,7 +268,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     /// <returns>A new bot chat.</returns>
     protected abstract TBotChat CreateChat(ChatId chatId);
 
-    private sealed class ChatSession : IDisposable
+    private sealed class ChatSession : IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource lifetime;
         private bool isDisposed;
@@ -299,6 +299,14 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             GC.SuppressFinalize(this);
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore().ConfigureAwait(false);
+
+            Dispose(disposing: false);
+            GC.SuppressFinalize(this);
+        }
+
         private void Dispose(bool disposing)
         {
             if (!this.isDisposed)
@@ -313,6 +321,29 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
                     this.Chat.Dispose();
                     this.lifetime.Dispose();
                 }
+
+                this.isDisposed = true;
+            }
+        }
+
+        private async ValueTask DisposeAsyncCore()
+        {
+            if (!this.isDisposed)
+            {
+                if (!this.lifetime.IsCancellationRequested)
+                {
+                    await this.lifetime.CancelAsync().ConfigureAwait(false);
+                }
+
+                if (this.Chat is IAsyncDisposable asyncDisposableChat)
+                {
+                    await asyncDisposableChat.DisposeAsync().ConfigureAwait(false);
+                }
+                else
+                {
+                    this.Chat.Dispose();
+                }
+                this.lifetime.Dispose();
 
                 this.isDisposed = true;
             }
