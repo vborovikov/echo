@@ -350,35 +350,3 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         }
     }
 }
-
-/// <summary>
-/// Operates the bot chats.
-/// </summary>
-public class BotForumOperator<TBotChat> : BotOperator<TBotChat>
-    where TBotChat : IBotChat<TBotChat>
-{
-    private readonly IBotForum<TBotChat> forum;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="BotForumOperator{TBotChat}"/> class.
-    /// </summary>
-    /// <param name="bot">The bot to operate.</param>
-    /// <param name="forum">The forum (a factory object) to create chats.</param>
-    /// <param name="logger">The logger.</param>
-    public BotForumOperator(IBot bot, IBotForum<TBotChat> forum, ILogger logger) : base(bot, logger)
-    {
-        this.forum = forum;
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="BotForumOperator{TBotChat}"/> class.
-    /// </summary>
-    /// <param name="bot">The bot to operate.</param>
-    /// <param name="forum">The forum (a factory object) to create chats.</param>
-    /// <param name="logger">The logger.</param>
-    public BotForumOperator(IBot bot, IBotForum<TBotChat> forum, ILogger<BotForumOperator<TBotChat>> logger)
-        : this(bot, forum, (ILogger)logger) { }
-
-    /// <inheritdoc/>
-    protected override TBotChat CreateChat(ChatId chatId) => this.forum.Create(this, chatId);
-}

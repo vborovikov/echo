@@ -6,21 +6,6 @@ using System.Threading.Tasks;
 using Telegram;
 
 /// <summary>
-/// Produces new bot chats.
-/// </summary>
-/// <typeparam name="TBotChat">The concrete type of the bot chat.</typeparam>
-public interface IBotForum<TBotChat> where TBotChat : IBotChat<TBotChat>
-{
-    /// <summary>
-    /// Creates a new bot chat.
-    /// </summary>
-    /// <param name="bot">The bot operator.</param>
-    /// <param name="chatId">The unique identifier of the chat.</param>
-    /// <returns>A new bot chat.</returns>
-    public TBotChat Create(IBotOperator bot, ChatId chatId);
-}
-
-/// <summary>
 /// Represents the bot interaction with a user in a specific chat.
 /// </summary>
 public interface IBotChat : IDisposable
