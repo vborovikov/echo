@@ -26,12 +26,33 @@ public enum ParseMode
     Html,
 }
 
+/// <summary>
+/// Describes the options used for link preview generation.
+/// </summary>
 public record LinkPreviewOptions
 {
+    /// <summary>
+    /// True, if the link preview is disabled.
+    /// </summary>
     public bool? IsDisabled { get; init; }
+    /// <summary>
+    /// URL to use for the link preview. If empty, then the first URL found in the message text will be used.
+    /// </summary>
     public string? Url { get; init; }
+    /// <summary>
+    /// True, if the media in the link preview is supposed to be shrunk; 
+    /// ignored if the URL isn't explicitly specified or media size change isn't supported for the preview.
+    /// </summary>
     public bool? PreferSmallMedia { get; init; }
+    /// <summary>
+    /// True, if the media in the link preview is supposed to be enlarged;
+    /// ignored if the URL isn't explicitly specified or media size change isn't supported for the preview
+    /// </summary>
     public bool? PreferLargeMedia { get; init; }
+    /// <summary>
+    /// True, if the link preview must be shown above the message text; 
+    /// otherwise, the link preview will be shown below the message text
+    /// </summary>
     public bool? ShowAboveText { get; init; }
 }
 

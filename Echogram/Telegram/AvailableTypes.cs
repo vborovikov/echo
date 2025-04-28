@@ -583,6 +583,32 @@ public record MessageEntity
 }
 
 /// <summary>
+/// Contains information about the quoted part of a message that is replied to by the given message.
+/// </summary>
+public record TextQuote
+{
+    /// <summary>
+    /// Text of the quoted part of a message that is replied to by the given message.
+    /// </summary>
+    public required string Text { get; init; }
+    /// <summary>
+    /// Special entities that appear in the quote.
+    /// </summary>
+    /// <remarks>
+    /// Currently, only bold, italic, underline, strikethrough, spoiler, and custom_emoji entities are kept in quotes.
+    /// </remarks>
+    public MessageEntity[] Entities { get; init; } = [];
+    /// <summary>
+    /// Approximate quote position in the original message in UTF-16 code units as specified by the sender.
+    /// </summary>
+    public int Position { get; init; }
+    /// <summary>
+    /// True, if the quote was chosen manually by the message sender. Otherwise, the quote was added automatically by the server.
+    /// </summary>
+    public bool IsManual { get; init; }
+}
+
+/// <summary>
 /// Represents a Telegram message.
 /// </summary>
 public record Message
@@ -672,7 +698,10 @@ public record Message
     /// </remarks>
     public Message? ReplyToMessage { get; init; }
     //public ExternalReplyInfo? ExternalReply { get; init; }
-    //public TextQuote? Quote { get; init; }
+    /// <summary>
+    /// For replies that quote part of the original message, the quoted part of the message.
+    /// </summary>
+    public TextQuote? Quote { get; init; }
     //public Story? ReplyToStory { get; init; }
     /// <summary>
     /// Bot through which the message was sent.
@@ -710,11 +739,26 @@ public record Message
     /// For text messages, special entities like usernames, URLs, bot commands, etc. that appear in the text.
     /// </summary>
     public MessageEntity[] Entities { get; init; } = [];
-    //public LinkPreviewOptions? LinkPreviewOptions { get; init; }
+    /// <summary>
+    /// Options used for link preview generation for the message, if it is a text message and link preview options were changed.
+    /// </summary>
+    public LinkPreviewOptions? LinkPreviewOptions { get; init; }
     /// <summary>
     /// Unique identifier of the message effect added to the message.
     /// </summary>
     public string? EffectId { get; init; }
+    /// <summary>
+    /// Caption for the animation, audio, document, paid media, photo, video or voice.
+    /// </summary>
+    public string? Caption { get; init; }
+    /// <summary>
+    /// For messages with a caption, special entities like usernames, URLs, bot commands, etc. that appear in the caption.
+    /// </summary>
+    public MessageEntity[] CaptionEntities { get; init; } = [];
+    /// <summary>
+    /// True, if the caption must be shown above the message media.
+    /// </summary>
+    public bool? ShowCaptionAboveMedia { get; init; }
 }
 
 [Flags]
