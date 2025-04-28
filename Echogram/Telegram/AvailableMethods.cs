@@ -18,11 +18,26 @@ record ApiResponse<TResult> : ApiResponse
 /// <param name="Method">The API method to call.</param>
 public abstract record ApiRequest<TResult>(string Method);
 
+/// <summary>
+/// Describes basic formatting for messages.
+/// </summary>
 public enum ParseMode
 {
-    Default,
+    /// <summary>
+    /// No formatting, text entities can be specified directly.
+    /// </summary>
+    Direct,
+    /// <summary>
+    /// This is a legacy mode, retained for backward compatibility.
+    /// </summary>
     Markdown,
+    /// <summary>
+    /// Markdown style.
+    /// </summary>
     MarkdownV2,
+    /// <summary>
+    /// HTML style.
+    /// </summary>
     Html,
 }
 
