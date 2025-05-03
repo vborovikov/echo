@@ -61,6 +61,8 @@ public sealed class TelegramBot : IBot
         this.log = logger;
     }
 
+    internal ILogger Log => this.log;
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -121,6 +123,15 @@ static class TelegramBotExtensions
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (Exception x) when (x is not OperationCanceledException)
+            {
+                (bot as TelegramBot)?.Log.LogWarning(EventIds.BotWaiting, x, "Failed executing Bot API request '{Method}'", updateRequest.Method);
+                if (updateRequest.Timeout is int timeoutInSeconds)
+                {
+                    // slow down the bot imitating no updates
+                    await Task.Delay(TimeSpan.FromSeconds(timeoutInSeconds), cts.Token);
+                }
             }
 
             if (updates.Length > 0)
