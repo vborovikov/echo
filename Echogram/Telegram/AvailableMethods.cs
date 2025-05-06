@@ -155,6 +155,25 @@ public record BotCommandScope(BotCommandScopeType Type)
     public UserId? UserId { get; init; }
 }
 
+/// <summary>
+/// Represents a type of action to broadcast.
+/// </summary>
+public enum ChatAction
+{
+    Unknown,
+    Typing,
+    UploadPhoto,
+    RecordVideo,
+    UploadVideo,
+    RecordVoice,
+    UploadVoice,
+    UploadDocument,
+    ChooseSticker,
+    FindLocation,
+    RecordVideoNote,
+    UploadVideoNote,
+}
+
 public static class Api
 {
     /// <summary>
@@ -215,6 +234,18 @@ public static class Api
     public static Task<Message> SendMessageAsync(this IBot bot, ChatId chatId, string text, ReplyMarkup replyMarkup, CancellationToken cancellationToken)
     {
         return bot.ExecuteAsync(new SendMessage(chatId, text) { ReplyMarkup = replyMarkup }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Tells the user that something is happening on the bot's side.
+    /// </summary>
+    /// <param name="ChatId">Unique identifier for the target chat or username of the target channel (in the format @channelusername).</param>
+    /// <param name="Action">Type of action to broadcast.</param>
+    public sealed record SendChatAction(ChatId ChatId, ChatAction Action) : ApiRequest<bool>("sendChatAction");
+
+    public static Task<bool> SendChatActionAsync(this IBot bot, ChatId chatId, ChatAction action, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendChatAction(chatId, action), cancellationToken);
     }
 
     public sealed record SetMyCommands(BotCommand[] Commands) : ApiRequest<bool>("setMyCommands")
