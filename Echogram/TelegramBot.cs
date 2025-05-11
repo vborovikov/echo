@@ -106,21 +106,19 @@ public sealed class TelegramBot : IBot
 
 static class TelegramBotExtensions
 {
-    public static async IAsyncEnumerable<Update> GetAllUpdatesAsync(this IBot bot, CancellationToken cancellationToken, [EnumeratorCancellation] CancellationToken enumeratorCancellationToken = default)
+    public static async IAsyncEnumerable<Update> GetAllUpdatesAsync(this IBot bot, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, enumeratorCancellationToken);
-
         var updateRequest = new Api.GetUpdates { Offset = 0 };
         while (true)
         {
-            cts.Token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
             var updates = Array.Empty<Update>();
             try
             {
-                updates = await bot.ExecuteAsync(updateRequest, cts.Token).ConfigureAwait(false);
+                updates = await bot.ExecuteAsync(updateRequest, cancellationToken).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
@@ -132,7 +130,7 @@ static class TelegramBotExtensions
                     // slow down the bot imitating no updates
                     var delay = TimeSpan.FromSeconds(timeoutInSeconds);
                     (bot as TelegramBot)?.Log.LogWarning(EventIds.BotWaiting, "Waiting for {Delay} before making new Bot API requests", delay);
-                    await Task.Delay(delay, cts.Token);
+                    await Task.Delay(delay, cancellationToken);
                 }
             }
 
