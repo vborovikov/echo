@@ -130,7 +130,9 @@ static class TelegramBotExtensions
                 if (updateRequest.Timeout is int timeoutInSeconds)
                 {
                     // slow down the bot imitating no updates
-                    await Task.Delay(TimeSpan.FromSeconds(timeoutInSeconds), cts.Token);
+                    var delay = TimeSpan.FromSeconds(timeoutInSeconds);
+                    (bot as TelegramBot)?.Log.LogWarning(EventIds.BotWaiting, "Waiting for {Delay} before making new Bot API requests", delay);
+                    await Task.Delay(delay, cts.Token);
                 }
             }
 
