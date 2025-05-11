@@ -106,7 +106,7 @@ public sealed class TelegramBot : IBot
 
 static class TelegramBotExtensions
 {
-    public static async IAsyncEnumerable<Update> GetAllUpdatesAsync(this IBot bot, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public static async IAsyncEnumerable<Update> GetAllUpdatesAsync(this IBot bot, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var updateRequest = new Api.GetUpdates { Offset = 0 };
         while (true)

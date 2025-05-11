@@ -148,7 +148,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(this.bot.GetAllUpdatesAsync(cancellationToken), cancellationToken,
+            await Parallel.ForEachAsync(this.bot.GetAllUpdatesAsync(), cancellationToken,
                 async (update, cancellationToken) =>
                 {
                     var message = update.Message ?? update.EditedMessage ?? update.ChannelPost ?? update.EditedChannelPost;
@@ -185,7 +185,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(messageReader.ReadAllAsync(cancellationToken), cancellationToken,
+            await Parallel.ForEachAsync(messageReader.ReadAllAsync(), cancellationToken,
                 async (message, cancellationToken) =>
                 {
                     var session = GetChatSession(message.Chat.Id, out var maybeNew);
@@ -221,7 +221,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(callbackReader.ReadAllAsync(cancellationToken), cancellationToken,
+            await Parallel.ForEachAsync(callbackReader.ReadAllAsync(), cancellationToken,
                 async (callback, cancellationToken) =>
                 {
                     var session = GetChatSession((ChatId)callback.From.Id, out _);
