@@ -10,5 +10,4 @@ static class EventIds
     public static readonly EventId BotExecuting = new(603, nameof(BotExecuting));
     public static readonly EventId BotWaiting = new(604, nameof(BotWaiting));
     public static readonly EventId BotConfused = new(605, nameof(BotConfused));
-    
 }

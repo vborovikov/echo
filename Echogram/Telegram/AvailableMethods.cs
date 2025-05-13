@@ -46,6 +46,8 @@ public enum ParseMode
 /// </summary>
 public record LinkPreviewOptions
 {
+    public static readonly LinkPreviewOptions Disabled = new() { IsDisabled = true };
+
     /// <summary>
     /// True, if the link preview is disabled.
     /// </summary>

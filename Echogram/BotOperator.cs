@@ -45,6 +45,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     private readonly IBot bot;
     private readonly ILogger log;
     private readonly ConcurrentDictionary<ChatId, ChatSession> chats;
+    private bool isDisposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BotOperator{TBotChat}"/> class.
@@ -61,12 +62,32 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     /// <inheritdoc/>
     public void Dispose()
     {
-        foreach (var (_, session) in this.chats)
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Performs the cleanup operations for the <see cref="BotOperator{TBotChat}"/> object.
+    /// </summary>
+    /// <param name="disposing">
+    /// Indicates whether the method is called from <see cref="Dispose()"/> (its value is <c>true</c>)
+    /// or from a finalizer (its value is <c>false</c>).
+    /// </param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (this.isDisposed) return;
+
+        if (disposing)
         {
-            session.Dispose();
+            foreach (var (_, session) in this.chats)
+            {
+                session.Dispose();
+            }
+            this.chats.Clear();
+            this.bot.Dispose();
         }
-        this.chats.Clear();
-        this.bot.Dispose();
+
+        this.isDisposed = true;
     }
 
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
@@ -309,44 +330,42 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 
         private void Dispose(bool disposing)
         {
-            if (!this.isDisposed)
-            {
-                if (disposing)
-                {
-                    if (!this.lifetime.IsCancellationRequested)
-                    {
-                        this.lifetime.Cancel();
-                    }
+            if (this.isDisposed) return;
 
-                    this.Chat.Dispose();
-                    this.lifetime.Dispose();
+            if (disposing)
+            {
+                if (!this.lifetime.IsCancellationRequested)
+                {
+                    this.lifetime.Cancel();
                 }
 
-                this.isDisposed = true;
+                this.Chat.Dispose();
+                this.lifetime.Dispose();
             }
+
+            this.isDisposed = true;
         }
 
         private async ValueTask DisposeAsyncCore()
         {
-            if (!this.isDisposed)
+            if (this.isDisposed) return;
+
+            if (!this.lifetime.IsCancellationRequested)
             {
-                if (!this.lifetime.IsCancellationRequested)
-                {
-                    await this.lifetime.CancelAsync().ConfigureAwait(false);
-                }
-
-                if (this.Chat is IAsyncDisposable asyncDisposableChat)
-                {
-                    await asyncDisposableChat.DisposeAsync().ConfigureAwait(false);
-                }
-                else
-                {
-                    this.Chat.Dispose();
-                }
-                this.lifetime.Dispose();
-
-                this.isDisposed = true;
+                await this.lifetime.CancelAsync().ConfigureAwait(false);
             }
+
+            if (this.Chat is IAsyncDisposable asyncDisposableChat)
+            {
+                await asyncDisposableChat.DisposeAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                this.Chat.Dispose();
+            }
+            this.lifetime.Dispose();
+
+            this.isDisposed = true;
         }
     }
 }
