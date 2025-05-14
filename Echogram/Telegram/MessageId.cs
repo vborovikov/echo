@@ -5,34 +5,42 @@ using System.Buffers.Text;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Identity = int;
 
 /// <summary>
-/// Represents a unique identifier for a message.
+/// Represents an unique identifier for a Telegram message.
 /// </summary>
 /// <remarks>
-/// The <see cref="MessageId"/> type is used to uniquely identify objects within the system.
+/// The <see cref="MessageId"/> type is used to uniquely identify messages within the system.
 /// </remarks>
 [TypeConverter(typeof(MessageIdTypeConverter)), JsonConverter(typeof(MessageIdJsonConverter))]
 public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparable<MessageId>,
-    ISpanFormattable, IUtf8SpanFormattable, ISpanParsable<MessageId>, IUtf8SpanParsable<MessageId>
+    ISpanFormattable, IUtf8SpanFormattable, ISpanParsable<MessageId>, IUtf8SpanParsable<MessageId>,
+    IEqualityOperators<MessageId, MessageId, bool>, IComparisonOperators<MessageId, MessageId, bool>
 {
-    private readonly int value;
+    private readonly Identity identity;
 
-    private MessageId(int value)
+    private MessageId(Identity value)
     {
-        this.value = value;
+        this.identity = value;
     }
 
-    public override int GetHashCode() => this.value.GetHashCode();
+    /// <inheritdoc />
+    public override int GetHashCode() => this.identity.GetHashCode();
 
-    public override string ToString() => this.value.ToString();
+    /// <inheritdoc />
+    public override string ToString() => this.identity.ToString("D", CultureInfo.InvariantCulture);
 
+    /// <inheritdoc />
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is MessageId id && Equals(id);
 
-    public bool Equals(MessageId other) => this.value.Equals(other.value);
+    /// <inheritdoc />
+    public bool Equals(MessageId other) => this.identity.Equals(other.identity);
 
+    /// <inheritdoc />
     public int CompareTo(object? obj)
     {
         if (obj is null)
@@ -43,22 +51,46 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
         return CompareTo(other);
     }
 
-    public int CompareTo(MessageId other) => this.value.CompareTo(other.value);
+    /// <inheritdoc />
+    public int CompareTo(MessageId other) => this.identity.CompareTo(other.identity);
 
-    public string ToString(string? format, IFormatProvider? formatProvider) => this.value.ToString(format, formatProvider);
+    /// <inheritdoc />
+    public string ToString(string? format, IFormatProvider? formatProvider) => this.identity.ToString(format, formatProvider);
 
+    /// <inheritdoc />
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.value.TryFormat(destination, out charsWritten, format);
+        this.identity.TryFormat(destination, out charsWritten, format);
 
+    /// <inheritdoc />
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.value.TryFormat(utf8Destination, out bytesWritten, format);
+        this.identity.TryFormat(utf8Destination, out bytesWritten, format);
 
+    /// <inheritdoc cref="Parse(ReadOnlySpan{char}, IFormatProvider?)" />
+    public static MessageId Parse(ReadOnlySpan<char> s) => Parse(s, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(ReadOnlySpan{char}, IFormatProvider?, out MessageId)" />
+    public static bool TryParse(ReadOnlySpan<char> s, [MaybeNullWhen(false)] out MessageId result) => TryParse(s, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc cref="Parse(string, IFormatProvider?)" />
+    public static MessageId Parse(string s) => Parse(s, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(string, IFormatProvider?, out MessageId)" />
+    public static bool TryParse(string s, [MaybeNullWhen(false)] out MessageId result) => TryParse(s, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc cref="Parse(ReadOnlySpan{byte}, IFormatProvider?)" />
+    public static MessageId Parse(ReadOnlySpan<byte> utf8Text) => Parse(utf8Text, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(ReadOnlySpan{byte}, IFormatProvider?, out MessageId)" />
+    public static bool TryParse(ReadOnlySpan<byte> utf8Text, [MaybeNullWhen(false)] out MessageId result) => TryParse(utf8Text, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc />
     public static MessageId Parse(ReadOnlySpan<char> s, IFormatProvider? provider) =>
         TryParse(s, provider, out var id) ? id : throw new FormatException();
 
+    /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out MessageId result)
     {
-        if (int.TryParse(s, provider, out var value))
+        if (Identity.TryParse(s, provider, out var value))
         {
             result = new(value);
             return true;
@@ -68,18 +100,22 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
         return false;
     }
 
+    /// <inheritdoc />
     public static MessageId Parse(string s, IFormatProvider? provider) =>
         Parse(s.AsSpan(), provider);
 
+    /// <inheritdoc />
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out MessageId result) =>
         TryParse(s.AsSpan(), provider, out result);
 
+    /// <inheritdoc />
     public static MessageId Parse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider) =>
         TryParse(utf8Text, provider, out var id) ? id : throw new FormatException();
 
+    /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider, [MaybeNullWhen(false)] out MessageId result)
     {
-        if (Utf8Parser.TryParse(utf8Text, out int value, out _))
+        if (Utf8Parser.TryParse(utf8Text, out Identity value, out _))
         {
             result = new(value);
             return true;
@@ -89,23 +125,52 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
         return false;
     }
 
+    /// <inheritdoc />
     public static bool operator ==(MessageId left, MessageId right) => left.Equals(right);
-    public static bool operator !=(MessageId left, MessageId right) => !(left == right);
-    public static bool operator >(MessageId left, MessageId right) => left.CompareTo(right) > 0;
-    public static bool operator <(MessageId left, MessageId right) => left.CompareTo(right) < 0;
-    public static bool operator >=(MessageId left, MessageId right) => left.CompareTo(right) >= 0;
-    public static bool operator <=(MessageId left, MessageId right) => left.CompareTo(right) <= 0;
-    public static implicit operator MessageId(int guid) => new(guid);
-    public static explicit operator int(MessageId id) => id.value;
 
+    /// <inheritdoc />
+    public static bool operator !=(MessageId left, MessageId right) => !(left == right);
+
+    /// <inheritdoc />
+    public static bool operator >(MessageId left, MessageId right) => left.CompareTo(right) > 0;
+
+    /// <inheritdoc />
+    public static bool operator <(MessageId left, MessageId right) => left.CompareTo(right) < 0;
+
+    /// <inheritdoc />
+    public static bool operator >=(MessageId left, MessageId right) => left.CompareTo(right) >= 0;
+
+    /// <inheritdoc />
+    public static bool operator <=(MessageId left, MessageId right) => left.CompareTo(right) <= 0;
+
+    /// <summary>
+    /// Implicitly converts the specified <see cref="Identity"/> to a MessageId
+    /// </summary>
+    /// <param name="id">The <see cref="Identity"/> to convert.</param>
+    /// <returns>A new instance of the <see cref="MessageId"/> type.</returns>
+    public static implicit operator MessageId(Identity id) => new(id);
+
+    /// <summary>
+    /// Explicitly converts the specified <see cref="MessageId"/> to an <see cref="Identity"/>.
+    /// </summary>
+    /// <param name="id">The <see cref="MessageId"/> to convert.</param>
+    /// <returns>The <see cref="Identity"/> that was converted.</returns>
+    public static explicit operator Identity(MessageId id) => id.identity;
+
+    /// <summary>
+    /// Converts the specified object to a <see cref="MessageId"/>.
+    /// </summary>
+    /// <param name="value">The object to convert.</param>
+    /// <param name="culture">The culture to use in the conversion.</param>
+    /// <returns>A <see cref="MessageId"/> that represents the converted object.</returns>
     public static MessageId ConvertFrom(object value, CultureInfo? culture = null) =>
         value switch
         {
-            byte[] span when Utf8Parser.TryParse(span, out int guid, out _) => new MessageId(guid),
-            char[] span when int.TryParse(span, culture, out var guid) => new MessageId(guid),
-            string str when int.TryParse(str, culture, out var guid) => new MessageId(guid),
-            int guid => new MessageId(guid),
-            not null when int.TryParse(value.ToString(), culture, out var guid) => new MessageId(guid),
+            byte[] span when Utf8Parser.TryParse(span, out Identity id, out _) => new MessageId(id),
+            char[] span when Identity.TryParse(span, culture, out var id) => new MessageId(id),
+            string str when Identity.TryParse(str, culture, out var id) => new MessageId(id),
+            Identity id => new MessageId(id),
+            not null when Identity.TryParse(value.ToString(), culture, out var id) => new MessageId(id),
             _ => throw new NotSupportedException()
         };
 
@@ -113,7 +178,7 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
     {
         public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) =>
             sourceType == typeof(byte[]) || sourceType == typeof(char[]) ||
-            sourceType == typeof(string) || sourceType == typeof(int);
+            sourceType == typeof(string) || sourceType == typeof(Identity);
 
         public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value) =>
             MessageId.ConvertFrom(value, culture);
@@ -125,6 +190,6 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
             new(reader.GetInt32());
 
         public override void Write(Utf8JsonWriter writer, MessageId value, JsonSerializerOptions options) =>
-            writer.WriteNumberValue(value.value);
+            writer.WriteNumberValue(value.identity);
     }
 }

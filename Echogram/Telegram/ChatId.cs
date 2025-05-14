@@ -5,34 +5,42 @@ using System.Buffers.Text;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Identity = long;
 
 /// <summary>
-/// Represents a unique identifier for a chat.
+/// Represents an unique identifier for a Telegram chat.
 /// </summary>
 /// <remarks>
-/// The <see cref="ChatId"/> type is used to uniquely identify objects within the system.
+/// The <see cref="ChatId"/> type is used to uniquely identify chats within the system.
 /// </remarks>
 [TypeConverter(typeof(ChatIdTypeConverter)), JsonConverter(typeof(ChatIdJsonConverter))]
 public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<ChatId>,
-    ISpanFormattable, IUtf8SpanFormattable, ISpanParsable<ChatId>, IUtf8SpanParsable<ChatId>
+    ISpanFormattable, IUtf8SpanFormattable, ISpanParsable<ChatId>, IUtf8SpanParsable<ChatId>,
+    IEqualityOperators<ChatId, ChatId, bool>, IComparisonOperators<ChatId, ChatId, bool>
 {
-    private readonly long value;
+    private readonly Identity identity;
 
-    private ChatId(long value)
+    private ChatId(Identity value)
     {
-        this.value = value;
+        this.identity = value;
     }
 
-    public override int GetHashCode() => this.value.GetHashCode();
+    /// <inheritdoc />
+    public override int GetHashCode() => this.identity.GetHashCode();
 
-    public override string ToString() => this.value.ToString();
+    /// <inheritdoc />
+    public override string ToString() => this.identity.ToString(CultureInfo.InvariantCulture);
 
+    /// <inheritdoc />
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is ChatId id && Equals(id);
 
-    public bool Equals(ChatId other) => this.value.Equals(other.value);
+    /// <inheritdoc />
+    public bool Equals(ChatId other) => this.identity.Equals(other.identity);
 
+    /// <inheritdoc />
     public int CompareTo(object? obj)
     {
         if (obj is null)
@@ -43,22 +51,46 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
         return CompareTo(other);
     }
 
-    public int CompareTo(ChatId other) => this.value.CompareTo(other.value);
+    /// <inheritdoc />
+    public int CompareTo(ChatId other) => this.identity.CompareTo(other.identity);
 
-    public string ToString(string? format, IFormatProvider? formatProvider) => this.value.ToString(format, formatProvider);
+    /// <inheritdoc />
+    public string ToString(string? format, IFormatProvider? formatProvider) => this.identity.ToString(format, formatProvider);
 
+    /// <inheritdoc />
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.value.TryFormat(destination, out charsWritten, format);
+        this.identity.TryFormat(destination, out charsWritten, format);
 
+    /// <inheritdoc />
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.value.TryFormat(utf8Destination, out bytesWritten, format);
+        this.identity.TryFormat(utf8Destination, out bytesWritten, format);
 
+    /// <inheritdoc cref="Parse(ReadOnlySpan{char}, IFormatProvider?)" />
+    public static ChatId Parse(ReadOnlySpan<char> s) => Parse(s, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(ReadOnlySpan{char}, IFormatProvider?, out ChatId)" />
+    public static bool TryParse(ReadOnlySpan<char> s, [MaybeNullWhen(false)] out ChatId result) => TryParse(s, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc cref="Parse(string, IFormatProvider?)" />
+    public static ChatId Parse(string s) => Parse(s, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(string, IFormatProvider?, out ChatId)" />
+    public static bool TryParse(string s, [MaybeNullWhen(false)] out ChatId result) => TryParse(s, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc cref="Parse(ReadOnlySpan{byte}, IFormatProvider?)" />
+    public static ChatId Parse(ReadOnlySpan<byte> utf8Text) => Parse(utf8Text, CultureInfo.InvariantCulture);
+
+    /// <inheritdoc cref="TryParse(ReadOnlySpan{byte}, IFormatProvider?, out ChatId)" />
+    public static bool TryParse(ReadOnlySpan<byte> utf8Text, [MaybeNullWhen(false)] out ChatId result) => TryParse(utf8Text, CultureInfo.InvariantCulture, out result);
+
+    /// <inheritdoc />
     public static ChatId Parse(ReadOnlySpan<char> s, IFormatProvider? provider) =>
         TryParse(s, provider, out var id) ? id : throw new FormatException();
 
+    /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out ChatId result)
     {
-        if (long.TryParse(s, provider, out var value))
+        if (Identity.TryParse(s, provider, out var value))
         {
             result = new(value);
             return true;
@@ -68,18 +100,22 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
         return false;
     }
 
+    /// <inheritdoc />
     public static ChatId Parse(string s, IFormatProvider? provider) =>
         Parse(s.AsSpan(), provider);
 
+    /// <inheritdoc />
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out ChatId result) =>
         TryParse(s.AsSpan(), provider, out result);
 
+    /// <inheritdoc />
     public static ChatId Parse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider) =>
         TryParse(utf8Text, provider, out var id) ? id : throw new FormatException();
 
+    /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider, [MaybeNullWhen(false)] out ChatId result)
     {
-        if (Utf8Parser.TryParse(utf8Text, out long value, out _))
+        if (Utf8Parser.TryParse(utf8Text, out Identity value, out _))
         {
             result = new(value);
             return true;
@@ -89,23 +125,52 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
         return false;
     }
 
+    /// <inheritdoc />
     public static bool operator ==(ChatId left, ChatId right) => left.Equals(right);
-    public static bool operator !=(ChatId left, ChatId right) => !(left == right);
-    public static bool operator >(ChatId left, ChatId right) => left.CompareTo(right) > 0;
-    public static bool operator <(ChatId left, ChatId right) => left.CompareTo(right) < 0;
-    public static bool operator >=(ChatId left, ChatId right) => left.CompareTo(right) >= 0;
-    public static bool operator <=(ChatId left, ChatId right) => left.CompareTo(right) <= 0;
-    public static implicit operator ChatId(long guid) => new(guid);
-    public static explicit operator long(ChatId id) => id.value;
 
+    /// <inheritdoc />
+    public static bool operator !=(ChatId left, ChatId right) => !(left == right);
+
+    /// <inheritdoc />
+    public static bool operator >(ChatId left, ChatId right) => left.CompareTo(right) > 0;
+
+    /// <inheritdoc />
+    public static bool operator <(ChatId left, ChatId right) => left.CompareTo(right) < 0;
+
+    /// <inheritdoc />
+    public static bool operator >=(ChatId left, ChatId right) => left.CompareTo(right) >= 0;
+
+    /// <inheritdoc />
+    public static bool operator <=(ChatId left, ChatId right) => left.CompareTo(right) <= 0;
+
+    /// <summary>
+    /// Implicitly converts the specified <see cref="Identity"/> to a <see cref="ChatId"/>
+    /// </summary>
+    /// <param name="id">The <see cref="Identity"/> to convert.</param>
+    /// <returns>A new instance of the <see cref="ChatId"/> type.</returns>
+    public static implicit operator ChatId(Identity id) => new(id);
+
+    /// <summary>
+    /// Explicitly converts the specified <see cref="ChatId"/> to an <see cref="Identity"/>.
+    /// </summary>
+    /// <param name="id">The <see cref="ChatId"/> to convert.</param>
+    /// <returns>The <see cref="Identity"/> that was converted.</returns>
+    public static explicit operator Identity(ChatId id) => id.identity;
+
+    /// <summary>
+    /// Converts the specified object to a <see cref="ChatId"/>.
+    /// </summary>
+    /// <param name="value">The object to convert.</param>
+    /// <param name="culture">The culture to use in the conversion.</param>
+    /// <returns>A <see cref="ChatId"/> that represents the converted object.</returns>
     public static ChatId ConvertFrom(object value, CultureInfo? culture = null) =>
         value switch
         {
-            byte[] span when Utf8Parser.TryParse(span, out long guid, out _) => new ChatId(guid),
-            char[] span when long.TryParse(span, culture, out var guid) => new ChatId(guid),
-            string str when long.TryParse(str, culture, out var guid) => new ChatId(guid),
-            long guid => new ChatId(guid),
-            not null when long.TryParse(value.ToString(), culture, out var guid) => new ChatId(guid),
+            byte[] span when Utf8Parser.TryParse(span, out Identity id, out _) => new ChatId(id),
+            char[] span when Identity.TryParse(span, culture, out var id) => new ChatId(id),
+            string str when Identity.TryParse(str, culture, out var id) => new ChatId(id),
+            Identity id => new ChatId(id),
+            not null when Identity.TryParse(value.ToString(), culture, out var id) => new ChatId(id),
             _ => throw new NotSupportedException()
         };
 
@@ -113,7 +178,7 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     {
         public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) =>
             sourceType == typeof(byte[]) || sourceType == typeof(char[]) ||
-            sourceType == typeof(string) || sourceType == typeof(Guid);
+            sourceType == typeof(string) || sourceType == typeof(Identity);
 
         public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value) =>
             ChatId.ConvertFrom(value, culture);
@@ -125,6 +190,6 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
             new(reader.GetInt64());
 
         public override void Write(Utf8JsonWriter writer, ChatId value, JsonSerializerOptions options) =>
-            writer.WriteNumberValue(value.value);
+            writer.WriteNumberValue(value.identity);
     }
 }
