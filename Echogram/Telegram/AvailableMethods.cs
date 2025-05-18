@@ -183,6 +183,9 @@ public static class Api
     /// </summary>
     public sealed record GetMe() : ApiRequest<BotUser>("getMe")
     {
+        /// <summary>
+        /// The default request instance.
+        /// </summary>
         public static readonly GetMe Default = new();
     }
 
@@ -250,15 +253,84 @@ public static class Api
         return bot.ExecuteAsync(new SendChatAction(chatId, action), cancellationToken);
     }
 
-    public sealed record SetMyCommands(BotCommand[] Commands) : ApiRequest<bool>("setMyCommands")
+    /// <summary>
+    /// Base request record for MyCommands APIs.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the result.</typeparam>
+    /// <param name="Method">The API method to call.</param>
+    public abstract record MyCommandsApiRequest<TResult>(string Method) : ApiRequest<TResult>(Method)
     {
+        /// <summary>
+        /// Describes scope of users for which the commands are relevant.
+        /// </summary>
         public BotCommandScope? Scope { get; init; }
+        /// <summary>
+        /// A two-letter ISO 639-1 language code. If empty, commands will be applied to all users from the given scope,
+        /// for whose language there are no dedicated commands.
+        /// </summary>
         public string? LanguageCode { get; init; }
     }
 
+    /// <summary>
+    /// Changes the list of the bot's commands.
+    /// </summary>
+    /// <param name="Commands">A list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.</param>
+    public sealed record SetMyCommands(BotCommand[] Commands) : MyCommandsApiRequest<bool>("setMyCommands");
+
+    /// <summary>
+    /// Changes the list of the bot's commands.
+    /// </summary>
+    /// <param name="bot">The bot API client.</param>
+    /// <param name="commands">A list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="Task{Boolean}"/> that represents the asynchronous operation.</returns>
     public static Task<bool> SetMyCommandsAsync(this IBot bot, BotCommand[] commands, CancellationToken cancellationToken)
     {
         return bot.ExecuteAsync(new SetMyCommands(commands) { Scope = new(BotCommandScopeType.Default) }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes the list of the bot's commands for the given scope and user language.
+    /// </summary>
+    public sealed record DeleteMyCommands() : MyCommandsApiRequest<bool>("deleteMyCommands")
+    {
+        /// <summary>
+        /// The default request instance.
+        /// </summary>
+        public static readonly DeleteMyCommands Default = new() { Scope = new(BotCommandScopeType.Default) };
+    }
+
+    /// <summary>
+    /// Deletes the list of the bot's commands for the given scope and user language.
+    /// </summary>
+    /// <param name="bot">The bot API client.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="Task{Boolean}"/> that represents the asynchronous operation.</returns>
+    public static Task<bool> DeleteMyCommandsAsync(this IBot bot, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(DeleteMyCommands.Default, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the current list of the bot's commands for the given scope and user language.
+    /// </summary>
+    public sealed record GetMyCommands() : MyCommandsApiRequest<BotCommand[]>("getMyCommands")
+    {
+        /// <summary>
+        /// The default request instance.
+        /// </summary>
+        public static readonly GetMyCommands Default = new() { Scope = new(BotCommandScopeType.Default) };
+    }
+
+    /// <summary>
+    /// Gets the current list of the bot's commands for the given scope and user language.
+    /// </summary>
+    /// <param name="bot">The bot API client.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to cancel the asynchronous operation.</param>
+    /// <returns>A <see cref="Task{BotCommand[]}"/> that represents the asynchronous operation.</returns>
+    public static Task<BotCommand[]> GetMyCommandsAsync(this IBot bot, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(GetMyCommands.Default, cancellationToken);
     }
 
     /// <summary>
