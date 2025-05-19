@@ -73,10 +73,23 @@ public record LinkPreviewOptions
     public bool? ShowAboveText { get; init; }
 }
 
+/// <summary>
+/// Describes reply parameters for the message that is being sent.
+/// </summary>
+/// <param name="MessageId">
+/// Identifier of the message that will be replied to in the current chat, or in the chat <see cref="ChatId"/> if it is specified.
+/// </param>
 public record ReplyParameters(MessageId MessageId)
 {
-    //public required int MessageId { get; init; }
+    /// <summary>
+    /// If the message to be replied to is from a different chat, unique identifier for the chat or
+    /// username of the channel (in the format <c>"@channelusername"</c>).
+    /// </summary>
     public ChatId? ChatId { get; init; }
+    /// <summary>
+    /// Pass True if the message should be sent even if the specified message to be replied to is not found. 
+    /// Always False for replies in another chat or forum topic. Always True for messages sent on behalf of a business account.
+    /// </summary>
     public bool? AllowSendingWithoutReply { get; init; }
     public string? Quote { get; init; }
     public ParseMode? QuoteParseMode { get; init; }
