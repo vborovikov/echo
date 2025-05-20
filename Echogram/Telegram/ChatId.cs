@@ -9,6 +9,9 @@ using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Identity = long;
+using AltIdentity = string;
+
+//todo: support string identity too
 
 /// <summary>
 /// Represents an unique identifier for a Telegram chat.
