@@ -187,7 +187,7 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     private sealed class ChatIdTypeConverter : TypeConverter
     {
         public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) =>
-            sourceType == typeof(byte[]) || sourceType == typeof(char[]) ||
+            sourceType == typeof(byte[]) || sourceType == typeof(char[]) || sourceType == typeof(long) ||
             sourceType == typeof(string) || sourceType == typeof(Identity);
 
         public override object ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value) =>
