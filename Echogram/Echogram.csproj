@@ -11,7 +11,7 @@
 
   <PropertyGroup>
     <PackageId>Echogram</PackageId>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/vborovikov/echo</PackageProjectUrl>
