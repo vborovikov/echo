@@ -1,17 +1,13 @@
 namespace Echo.Telegram;
 
 using System;
-using System.Buffers.Text;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Identity = long;
-using AltIdentity = string;
-
-//todo: support string identity too
+using Identity = Serialization.IntegerOrString<long>;
 
 /// <summary>
 /// Represents an unique identifier for a Telegram chat.
@@ -35,7 +31,7 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     public override int GetHashCode() => this.identity.GetHashCode();
 
     /// <inheritdoc />
-    public override string ToString() => this.identity.ToString(CultureInfo.InvariantCulture);
+    public override string ToString() => ToString(null, CultureInfo.InvariantCulture);
 
     /// <inheritdoc />
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is ChatId id && Equals(id);
@@ -58,15 +54,25 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     public int CompareTo(ChatId other) => this.identity.CompareTo(other.identity);
 
     /// <inheritdoc />
-    public string ToString(string? format, IFormatProvider? formatProvider) => this.identity.ToString(format, formatProvider);
+    public string ToString(string? format, IFormatProvider? formatProvider)
+    {
+        var str = this.identity.ToString(format, formatProvider);
+
+        if (!this.identity.IsInteger && !str.StartsWith('@'))
+        {
+            return '@' + str;
+        }
+
+        return str;
+    }
 
     /// <inheritdoc />
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.identity.TryFormat(destination, out charsWritten, format);
+        this.identity.TryFormat(destination, out charsWritten, format, provider);
 
     /// <inheritdoc />
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.identity.TryFormat(utf8Destination, out bytesWritten, format);
+        this.identity.TryFormat(utf8Destination, out bytesWritten, format, provider);
 
     /// <inheritdoc cref="Parse(ReadOnlySpan{char}, IFormatProvider?)" />
     public static ChatId Parse(ReadOnlySpan<char> s) => Parse(s, CultureInfo.InvariantCulture);
@@ -118,7 +124,7 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider, [MaybeNullWhen(false)] out ChatId result)
     {
-        if (Utf8Parser.TryParse(utf8Text, out Identity value, out _))
+        if (Identity.TryParse(utf8Text, provider, out Identity value))
         {
             result = new(value);
             return true;
@@ -147,18 +153,18 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     public static bool operator <=(ChatId left, ChatId right) => left.CompareTo(right) <= 0;
 
     /// <summary>
-    /// Implicitly converts the specified <see cref="Identity"/> to a <see cref="ChatId"/>
+    /// Implicitly converts the specified <see cref="long">integer</see> to a <see cref="ChatId"/>
     /// </summary>
-    /// <param name="id">The <see cref="Identity"/> to convert.</param>
+    /// <param name="id">The <see cref="long">integer</see> to convert.</param>
     /// <returns>A new instance of the <see cref="ChatId"/> type.</returns>
-    public static implicit operator ChatId(Identity id) => new(id);
+    public static implicit operator ChatId(long id) => new(id);
 
     /// <summary>
-    /// Explicitly converts the specified <see cref="ChatId"/> to an <see cref="Identity"/>.
+    /// Explicitly converts the specified <see cref="ChatId"/> to an <see cref="long">integer</see>.
     /// </summary>
     /// <param name="id">The <see cref="ChatId"/> to convert.</param>
-    /// <returns>The <see cref="Identity"/> that was converted.</returns>
-    public static explicit operator Identity(ChatId id) => id.identity;
+    /// <returns>The <see cref="long">integer</see> that was converted.</returns>
+    public static explicit operator long(ChatId id) => (long)id.identity;
 
     /// <summary>
     /// Converts the specified object to a <see cref="ChatId"/>.
@@ -169,7 +175,8 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     public static ChatId ConvertFrom(object value, CultureInfo? culture = null) =>
         value switch
         {
-            byte[] span when Utf8Parser.TryParse(span, out Identity id, out _) => new ChatId(id),
+            long id => new ChatId(id),
+            byte[] span when Identity.TryParse(span, culture, out Identity id) => new ChatId(id),
             char[] span when Identity.TryParse(span, culture, out var id) => new ChatId(id),
             string str when Identity.TryParse(str, culture, out var id) => new ChatId(id),
             Identity id => new ChatId(id),
@@ -190,9 +197,18 @@ public readonly struct ChatId : IEquatable<ChatId>, IComparable, IComparable<Cha
     private sealed class ChatIdJsonConverter : JsonConverter<ChatId>
     {
         public override ChatId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            new(reader.GetInt64());
+            new(reader.TokenType == JsonTokenType.Number ? reader.GetInt64() : reader.GetString());
 
-        public override void Write(Utf8JsonWriter writer, ChatId value, JsonSerializerOptions options) =>
-            writer.WriteNumberValue(value.identity);
+        public override void Write(Utf8JsonWriter writer, ChatId value, JsonSerializerOptions options)
+        {
+            if (value.identity.IsInteger)
+            {
+                writer.WriteNumberValue((long)value.identity);
+            }
+            else
+            {
+                writer.WriteStringValue((string)value.identity);
+            }
+        }
     }
 }
