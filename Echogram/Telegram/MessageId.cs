@@ -1,7 +1,6 @@
 namespace Echo.Telegram;
 
 using System;
-using System.Buffers.Text;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -32,7 +31,7 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
     public override int GetHashCode() => this.identity.GetHashCode();
 
     /// <inheritdoc />
-    public override string ToString() => this.identity.ToString("D", CultureInfo.InvariantCulture);
+    public override string ToString() => this.identity.ToString(CultureInfo.InvariantCulture);
 
     /// <inheritdoc />
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is MessageId id && Equals(id);
@@ -59,11 +58,11 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
 
     /// <inheritdoc />
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.identity.TryFormat(destination, out charsWritten, format);
+        this.identity.TryFormat(destination, out charsWritten, format, provider);
 
     /// <inheritdoc />
     public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
-        this.identity.TryFormat(utf8Destination, out bytesWritten, format);
+        this.identity.TryFormat(utf8Destination, out bytesWritten, format, provider);
 
     /// <inheritdoc cref="Parse(ReadOnlySpan{char}, IFormatProvider?)" />
     public static MessageId Parse(ReadOnlySpan<char> s) => Parse(s, CultureInfo.InvariantCulture);
@@ -115,7 +114,7 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
     /// <inheritdoc />
     public static bool TryParse(ReadOnlySpan<byte> utf8Text, IFormatProvider? provider, [MaybeNullWhen(false)] out MessageId result)
     {
-        if (Utf8Parser.TryParse(utf8Text, out Identity value, out _))
+        if (Identity.TryParse(utf8Text, provider, out Identity value))
         {
             result = new(value);
             return true;
@@ -166,7 +165,7 @@ public readonly struct MessageId : IEquatable<MessageId>, IComparable, IComparab
     public static MessageId ConvertFrom(object value, CultureInfo? culture = null) =>
         value switch
         {
-            byte[] span when Utf8Parser.TryParse(span, out Identity id, out _) => new MessageId(id),
+            byte[] span when Identity.TryParse(span, culture, out Identity id) => new MessageId(id),
             char[] span when Identity.TryParse(span, culture, out var id) => new MessageId(id),
             string str when Identity.TryParse(str, culture, out var id) => new MessageId(id),
             Identity id => new MessageId(id),
