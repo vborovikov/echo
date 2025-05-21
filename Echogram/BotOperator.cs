@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Telegram;
 
@@ -42,6 +43,8 @@ public interface IBotOperator<TBotChat> : IBotOperator
 public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     where TBotChat : IBotChat<TBotChat>
 {
+    private static readonly TimeSpan DefaultInactivityPeriod = TimeSpan.FromMinutes(7);
+
     private readonly IBot bot;
     private readonly ILogger log;
     private readonly ConcurrentDictionary<ChatId, ChatSession> chats;
@@ -58,6 +61,11 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         this.log = logger;
         this.chats = new();
     }
+
+    /// <summary>
+    /// Gets or sets the inactivity period for a chat session.
+    /// </summary>
+    public TimeSpan InactivityPeriod { get; init; } = DefaultInactivityPeriod;
 
     /// <inheritdoc/>
     public void Dispose()
@@ -111,7 +119,6 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         if (this.chats.TryRemove(chat.ChatId, out var removedSession))
         {
             await removedSession.StopAsync(user, cancellationToken).ConfigureAwait(false);
-            await removedSession.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -148,7 +155,6 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             foreach (var (_, session) in this.chats)
             {
                 await session.StopAsync().ConfigureAwait(false);
-                await session.DisposeAsync().ConfigureAwait(false);
             }
             this.chats.Clear();
 
@@ -275,11 +281,12 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         if (this.chats.TryGetValue(chatId, out var session))
         {
             maybeNew = false;
+            session.Resume();
             return session;
         }
 
         maybeNew = true;
-        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => new ChatSession(botOperator.CreateChat(chatId)), this);
+        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => new ChatSession(botOperator, botOperator.CreateChat(chatId)), this);
     }
 
     /// <summary>
@@ -291,13 +298,17 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 
     private sealed class ChatSession : IDisposable, IAsyncDisposable
     {
+        private readonly BotOperator<TBotChat> owner;
         private readonly CancellationTokenSource lifetime;
+        private readonly CancellationTokenRegistration removal;
         private bool isDisposed;
 
-        public ChatSession(TBotChat chat)
+        public ChatSession(BotOperator<TBotChat> owner, TBotChat chat)
         {
+            this.owner = owner;
             this.Chat = chat;
-            this.lifetime = new CancellationTokenSource();
+            this.lifetime = new CancellationTokenSource(this.owner.InactivityPeriod);
+            this.removal = this.lifetime.Token.Register(SelfSuspend, this, useSynchronizationContext: false);
         }
 
         public TBotChat Chat { get; }
@@ -306,11 +317,25 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 
         public async Task StopAsync(User? user = default, CancellationToken cancellationToken = default)
         {
+            // say bye to the user
             await this.Chat.EndAsync(user, cancellationToken).ConfigureAwait(false);
-
-            // the provided cancellation token can be linked with the lifetime token
-            // cancel the lifetime last
+            // the provided cancellation token can be linked with the lifetime token, cancel the lifetime last
             await this.lifetime.CancelAsync().ConfigureAwait(false);
+            // dispose itself
+            await DisposeAsync().ConfigureAwait(false);
+        }
+
+        public void Resume()
+        {
+            this.lifetime.CancelAfter(this.owner.InactivityPeriod);
+        }
+
+        private void Suspend()
+        {
+            if (this.owner.chats.TryRemove(this.Chat.ChatId, out _))
+            {
+                Dispose();
+            }
         }
 
         public void Dispose()
@@ -334,6 +359,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
 
             if (disposing)
             {
+                this.removal.Dispose();
                 if (!this.lifetime.IsCancellationRequested)
                 {
                     this.lifetime.Cancel();
@@ -350,6 +376,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         {
             if (this.isDisposed) return;
 
+            await this.removal.DisposeAsync().ConfigureAwait(false);
             if (!this.lifetime.IsCancellationRequested)
             {
                 await this.lifetime.CancelAsync().ConfigureAwait(false);
@@ -366,6 +393,11 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
             this.lifetime.Dispose();
 
             this.isDisposed = true;
+        }
+
+        private static void SelfSuspend(object? obj)
+        {
+            (obj as ChatSession)?.Suspend();
         }
     }
 }
