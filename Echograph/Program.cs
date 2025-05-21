@@ -93,7 +93,10 @@ class Program
             return new TelegramBot(botToken, http, logging.CreateLogger<TelegramBot>());
         });
 
-        services.AddSingleton<EchoBot>();
+        services.AddSingleton<EchoBot>(sp => new(sp.GetRequiredService<IBot>(), sp.GetRequiredService<ILogger<EchoBot>>())
+        {
+            InactivityPeriod = TimeSpan.FromMinutes(1)
+        });
 
         return services.BuildServiceProvider();
     }
