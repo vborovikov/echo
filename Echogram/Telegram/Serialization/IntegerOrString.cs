@@ -2,6 +2,7 @@
 
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
@@ -25,6 +26,7 @@ readonly struct IntegerOrString<TInteger>
         this.str = value ?? string.Empty;
     }
 
+    [MemberNotNullWhen(false, nameof(str))]
     public bool IsInteger => this.str is null;
 
     public override bool Equals(object? obj)
