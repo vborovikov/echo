@@ -122,7 +122,7 @@ static class TelegramBotExtensions
             {
                 throw;
             }
-            catch (Exception x) when (x is not OperationCanceledException)
+            catch (Exception x) when (x is not OperationCanceledException ocx || ocx.InnerException is TimeoutException)
             {
                 (bot as TelegramBot)?.Log.LogWarning(EventIds.BotWaiting, x, "Failed executing Bot API request '{Method}'", updateRequest.Method);
                 if (updateRequest.Timeout is int timeoutInSeconds)
