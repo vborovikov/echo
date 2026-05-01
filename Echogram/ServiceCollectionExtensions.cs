@@ -3,6 +3,7 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -170,7 +171,7 @@ public static class ServiceCollectionExtensions
 
     private static IServiceCollection AddTelegramClient(this IServiceCollection services, string botToken)
     {
-        services.AddHttpClient<IBot, TelegramBot>((http, sp) =>
+        services.AddHttpClient<TelegramBot, TelegramBot>((http, sp) =>
         {
             var options = sp.GetRequiredService<IOptions<TelegramBotOptions>>();
 
@@ -201,6 +202,8 @@ public static class ServiceCollectionExtensions
                 }
             }
         });
+
+        services.TryAddSingleton<IBot>(sp => sp.GetRequiredService<TelegramBot>());
 
         return services;
     }
