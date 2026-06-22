@@ -145,22 +145,24 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
                 SingleReader = true,
             });
 
-            await Task.WhenAll(
-                ReceiveUpdatesAsync(messageChannel, callbackChannel, cancellationToken),
-                HandleMessagesAsync(messageChannel, cancellationToken),
-                HandleCallbacksAsync(callbackChannel, cancellationToken)).ConfigureAwait(false);
+            var completedTask = await Task.WhenAny(
+                    ReceiveUpdatesAsync(messageChannel, callbackChannel, cancellationToken),
+                    HandleMessagesAsync(messageChannel, cancellationToken),
+                    HandleCallbacksAsync(callbackChannel, cancellationToken))
+                .WaitAsync(cancellationToken).ConfigureAwait(false);
+            await completedTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             foreach (var (_, session) in this.chats)
             {
-                await session.StopAsync().ConfigureAwait(false);
+                await session.StopAsync(cancellationToken: default).ConfigureAwait(false);
             }
             this.chats.Clear();
 
             throw;
         }
-        catch (Exception x) when (x is not OperationCanceledException)
+        catch (Exception x)
         {
             this.log.LogError(EventIds.BotFailed, x, "Bot operation failed");
         }
@@ -175,7 +177,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(this.bot.GetAllUpdatesAsync(), cancellationToken,
+            await Parallel.ForEachAsync(this.bot.GetAllUpdatesAsync(default), cancellationToken,
                 async (update, cancellationToken) =>
                 {
                     var message = update.Message ?? update.EditedMessage ?? update.ChannelPost ?? update.EditedChannelPost;
@@ -212,7 +214,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(messageReader.ReadAllAsync(), cancellationToken,
+            await Parallel.ForEachAsync(messageReader.ReadAllAsync(default), cancellationToken,
                 async (message, cancellationToken) =>
                 {
                     var session = GetChatSession(message.Chat.Id, out var maybeNew);
@@ -248,7 +250,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     {
         try
         {
-            await Parallel.ForEachAsync(callbackReader.ReadAllAsync(), cancellationToken,
+            await Parallel.ForEachAsync(callbackReader.ReadAllAsync(default), cancellationToken,
                 async (callback, cancellationToken) =>
                 {
                     var session = GetChatSession((ChatId)callback.From.Id, out _);
@@ -286,7 +288,7 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
         }
 
         maybeNew = true;
-        return this.chats.GetOrAdd(chatId, (chatId, botOperator) => new ChatSession(botOperator, botOperator.CreateChat(chatId)), this);
+        return this.chats.GetOrAdd(chatId, static (chatId, botOperator) => new ChatSession(botOperator, botOperator.CreateChat(chatId)), this);
     }
 
     /// <summary>
