@@ -583,6 +583,72 @@ public record MessageEntity
 }
 
 /// <summary>
+/// Base for file-based API entities.
+/// </summary>
+public abstract record FileBase
+{
+    /// <summary>
+    /// Identifier for this file, which can be used to download or reuse the file.
+    /// </summary>
+    public required string FileId { get; init; }
+    /// <summary>
+    /// Unique identifier for this file, which is supposed to be the same over time and for different bots.
+    /// </summary>
+    /// <remarks>
+    /// Can't be used to download or reuse the file.
+    /// </remarks>
+    public required string FileUniqueId { get; init; }
+    /// <summary>
+    /// Size of the file in bytes.
+    /// </summary>
+    /// <remarks>
+    /// It can be bigger than 2^31, so a signed 64-bit integer is safe for storing this value.
+    /// </remarks>
+    public long? FileSize { get; init; }
+}
+
+/// <summary>
+/// Represents a voice message.
+/// </summary>
+public record Voice : FileBase
+{
+    /// <summary>
+    /// Duration of the audio in seconds as defined by the sender.
+    /// </summary>
+    public int Duration { get; init; }
+    /// <summary>
+    /// MIME type of the file as defined by the sender.
+    /// </summary>
+    public string? MimeType { get; init; }
+}
+
+/// <summary>
+/// Represents a file.
+/// </summary>
+public record File : FileBase
+{
+    /// <summary>
+    /// File path. Use <c>"https://api.telegram.org/file/bot&lt;token&gt;/&lt;file_path&gt;"</c> to get the file.
+    /// </summary>
+    public string? FilePath { get; init; }
+}
+
+/// <summary>
+/// Represents one size of a photo or a file/sticker thumbnail.
+/// </summary>
+public record PhotoSize : FileBase
+{
+    /// <summary>
+    /// Photo width.
+    /// </summary>
+    public int Width { get; init; }
+    /// <summary>
+    /// Photo height.
+    /// </summary>
+    public int Height { get; init; }
+}
+
+/// <summary>
 /// Contains information about the quoted part of a message that is replied to by the given message.
 /// </summary>
 public record TextQuote
@@ -759,6 +825,14 @@ public record Message
     /// True, if the caption must be shown above the message media.
     /// </summary>
     public bool? ShowCaptionAboveMedia { get; init; }
+    /// <summary>
+    /// If the message is a voice message, information about the file.
+    /// </summary>
+    public Voice? Voice { get; init; }
+    /// <summary>
+    /// If the message is a photo, available sizes of the photo.
+    /// </summary>
+    public PhotoSize[] Photo { get; init; } = [];
 }
 
 [Flags]

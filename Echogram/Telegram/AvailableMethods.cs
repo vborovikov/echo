@@ -1,5 +1,10 @@
 namespace Echo.Telegram;
 
+using Serialization;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 /// <summary>
@@ -15,8 +20,125 @@ record ApiResponse<TResult> : ApiResponse
 /// Represents a request to the Telegram Bot API.
 /// </summary>
 /// <typeparam name="TResult">The type of the result.</typeparam>
-/// <param name="Method">The API method to call.</param>
-public abstract record ApiRequest<TResult>(string Method);
+public abstract record ApiRequest<TResult>
+{
+    protected ApiRequest(string method)
+    {
+        this.Method = method;
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+    public string Method { get; }
+}
+
+/// <summary>
+/// Represents a request to the Telegram Bot API that can be submitted with a file upload.
+/// </summary>
+/// <typeparam name="TResult">The type of the result.</typeparam>
+public abstract record ApiForm<TResult> : ApiRequest<TResult>
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ApiForm{TResult}"/> class.
+    /// </summary>
+    /// <param name="Method">The API method to call.</param>
+    protected ApiForm(string Method) : base(Method) { }
+
+    /// <summary>
+    /// Gets a value indicating whether the request has file content to upload.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+    public abstract bool HasContent { get; }
+
+    /// <summary>
+    /// Serializes the form fields to submit with the request, in order.
+    /// </summary>
+    public abstract void SerializeTo(IForm form);
+
+    /// <summary>
+    /// Serializes the request into a multipart form data content.
+    /// </summary>
+    /// <param name="jsonMediaType"></param>
+    /// <param name="jsonOptions">The JSON serializer options used to serialize the fields.</param>
+    /// <returns>The multipart form data content.</returns>
+    internal MultipartFormDataContent Submit(MediaTypeHeaderValue jsonMediaType, JsonSerializerOptions jsonOptions)
+    {
+        var form = new Form(jsonMediaType, jsonOptions);
+        SerializeTo(form);
+        return form.Data;
+    }
+
+    private sealed class Form : IForm
+    {
+        private static readonly MediaTypeHeaderValue fileContentType = new("application/octet-stream");
+        private readonly MediaTypeHeaderValue jsonMediaType;
+        private readonly JsonSerializerOptions jsonOptions;
+        private int fileIndex;
+
+        public Form(MediaTypeHeaderValue jsonMediaType, JsonSerializerOptions jsonOptions)
+        {
+            this.jsonMediaType = jsonMediaType;
+            this.jsonOptions = jsonOptions;
+            this.Data = [];
+        }
+
+        public MultipartFormDataContent Data { get; }
+
+        public bool Add(string name, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                this.Data.Add(new StringContent(value), ConvertName(name));
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool Add(string name, InputFile file)
+        {
+            if (file.Content is not null)
+            {
+                var fileName = file.FileName ?? name;
+                var fileContent = new StreamContent(file.Content)
+                {
+                    Headers =
+                {
+                    ContentType = fileContentType,
+                    //ContentDisposition = new ContentDispositionHeaderValue($"form-data; name=\"{this.fileIndex++}\"; filename=\"{fileName}\""),
+                }
+                };
+                this.Data.Add(fileContent, ConvertName(name), fileName);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool Add<T>(string name, T? value)
+        {
+            if (value is not null)
+            {
+                this.Data.Add(JsonContent.Create(value, this.jsonMediaType, this.jsonOptions), ConvertName(name));
+                return true;
+            }
+
+            return false;
+        }
+
+        private string ConvertName(string name)
+        {
+            return this.jsonOptions.PropertyNamingPolicy is not null ? this.jsonOptions.PropertyNamingPolicy.ConvertName(name) : name;
+        }
+    }
+}
+
+public interface IForm
+{
+    bool Add(string name, string? value);
+    bool Add(string name, InputFile file);
+    bool Add<T>(string name, T? value);
+}
 
 /// <summary>
 /// Describes basic formatting for messages.
@@ -71,6 +193,35 @@ public record LinkPreviewOptions
     /// otherwise, the link preview will be shown below the message text
     /// </summary>
     public bool? ShowAboveText { get; init; }
+}
+
+/// <summary>
+/// Represents a file to be sent to Telegram.
+/// </summary>
+/// <remarks>
+/// Pass a file identifier to send a file that exists on the Telegram servers (recommended),
+/// a URL for Telegram to get a file from the Internet, or upload a new one using
+/// an HTTPS POST request with multipart content.
+/// </remarks>
+[JsonConverter(typeof(InputFileJsonConverter))]
+public record InputFile
+{
+    /// <summary>
+    /// File identifier to send a file that exists on the Telegram servers.
+    /// </summary>
+    public string? FileId { get; init; }
+    /// <summary>
+    /// File name to upload. Must not be empty and can be a filename with a path, for example 'documents/text.txt'.
+    /// </summary>
+    public string? FileName { get; init; }
+    /// <summary>
+    /// A URL that the bot will download the file from.
+    /// </summary>
+    public string? ExternalUrl { get; init; }
+    /// <summary>
+    /// The content of the file to upload.
+    /// </summary>
+    public Stream? Content { get; init; }
 }
 
 /// <summary>
@@ -255,6 +406,131 @@ public static class Api
     }
 
     /// <summary>
+    /// Sends a voice message to a chat.
+    /// </summary>
+    /// <param name="ChatId">Unique identifier for the target chat or username of the target channel (in the format @channelusername).</param>
+    /// <param name="Voice">Voice file to send.</param>
+    public sealed record SendVoice(ChatId ChatId, InputFile Voice) : ApiForm<Message>("sendVoice")
+    {
+        /// <summary>
+        /// Duration of the audio in seconds.
+        /// </summary>
+        public int? Duration { get; init; }
+        /// <summary>
+        /// Caption for the voice message, 0-1024 characters after entities parsing.
+        /// </summary>
+        public string? Caption { get; init; }
+        public ParseMode? ParseMode { get; init; }
+        public MessageEntity[]? CaptionEntities { get; init; }
+        public bool? DisableNotification { get; init; }
+        public bool? ProtectContent { get; init; }
+        public string? MessageEffectId { get; init; }
+        /// <summary>
+        /// Description of the message to reply to.
+        /// </summary>
+        /// <remarks>
+        /// The original message will be quoted.
+        /// </remarks>
+        public ReplyParameters? ReplyParameters { get; init; }
+        public ReplyMarkup? ReplyMarkup { get; init; }
+
+        /// <inheritdoc/>
+        [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+        public override bool HasContent => this.Voice.Content is not null;
+
+        /// <inheritdoc/>
+        public override void SerializeTo(IForm form)
+        {
+            form.Add(nameof(this.ChatId), this.ChatId);
+            form.Add(nameof(this.Duration), this.Duration);
+            form.Add(nameof(this.Caption), this.Caption);
+            form.Add(nameof(this.ParseMode), this.ParseMode);
+            form.Add(nameof(this.CaptionEntities), this.CaptionEntities);
+            form.Add(nameof(this.DisableNotification), this.DisableNotification);
+            form.Add(nameof(this.ProtectContent), this.ProtectContent);
+            form.Add(nameof(this.MessageEffectId), this.MessageEffectId);
+            form.Add(nameof(this.ReplyParameters), this.ReplyParameters);
+            form.Add(nameof(this.ReplyMarkup), this.ReplyMarkup);
+            form.Add(nameof(this.Voice), this.Voice);
+        }
+    }
+
+    public static Task<Message> SendVoiceAsync(this IBot bot, ChatId chatId, InputFile voice, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendVoice(chatId, voice), cancellationToken);
+    }
+
+    public static Task<Message> SendVoiceAsync(this IBot bot, ChatId chatId, InputFile voice, int duration, string caption, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendVoice(chatId, voice) { Duration = duration, Caption = caption }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends a photo to a chat.
+    /// </summary>
+    /// <param name="ChatId">Unique identifier for the target chat or username of the target channel (in the format @channelusername).</param>
+    /// <param name="Photo">Photo to send.</param>
+    public sealed record SendPhoto(ChatId ChatId, InputFile Photo) : ApiForm<Message>("sendPhoto")
+    {
+        /// <summary>
+        /// Caption for the photo, 0-1024 characters after entities parsing.
+        /// </summary>
+        public string? Caption { get; init; }
+        public ParseMode? ParseMode { get; init; }
+        public MessageEntity[]? CaptionEntities { get; init; }
+        /// <summary>
+        /// Pass True if the caption must be shown above the message media.
+        /// </summary>
+        public bool? ShowCaptionAboveMedia { get; init; }
+        /// <summary>
+        /// Pass True if the photo needs to be covered with a spoiler animation.
+        /// </summary>
+        public bool? HasSpoiler { get; init; }
+        public bool? DisableNotification { get; init; }
+        public bool? ProtectContent { get; init; }
+        public string? MessageEffectId { get; init; }
+        /// <summary>
+        /// Description of the message to reply to.
+        /// </summary>
+        /// <remarks>
+        /// The original message will be quoted.
+        /// </remarks>
+        public ReplyParameters? ReplyParameters { get; init; }
+        public ReplyMarkup? ReplyMarkup { get; init; }
+
+        /// <inheritdoc/>
+        [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+        public override bool HasContent => this.Photo.Content is not null;
+
+        /// <inheritdoc/>
+        public override void SerializeTo(IForm form)
+        {
+            form.Add(nameof(this.ChatId), this.ChatId);
+            form.Add(nameof(this.Caption), this.Caption);
+            form.Add(nameof(this.ParseMode), this.ParseMode);
+            form.Add(nameof(this.CaptionEntities), this.CaptionEntities);
+            form.Add(nameof(this.ShowCaptionAboveMedia), this.ShowCaptionAboveMedia);
+            form.Add(nameof(this.HasSpoiler), this.HasSpoiler);
+            form.Add(nameof(this.DisableNotification), this.DisableNotification);
+            form.Add(nameof(this.ProtectContent), this.ProtectContent);
+            form.Add(nameof(this.MessageEffectId), this.MessageEffectId);
+            form.Add(nameof(this.ReplyParameters), this.ReplyParameters);
+            form.Add(nameof(this.ReplyMarkup), this.ReplyMarkup);
+            form.Add(nameof(this.Photo), this.Photo);
+        }
+    }
+
+    public static Task<Message> SendPhotoAsync(this IBot bot, ChatId chatId, InputFile photo, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendPhoto(chatId, photo), cancellationToken);
+    }
+
+    public static Task<Message> SendPhotoAsync(this IBot bot, ChatId chatId, InputFile photo, string caption, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new SendPhoto(chatId, photo) { Caption = caption }, cancellationToken);
+    }
+
+    /// <summary>
     /// Tells the user that something is happening on the bot's side.
     /// </summary>
     /// <param name="ChatId">Unique identifier for the target chat or username of the target channel (in the format @channelusername).</param>
@@ -380,5 +656,35 @@ public static class Api
     public static Task<bool> AnswerCallbackQueryAsync(this IBot bot, string callbackQueryId, string text, CancellationToken cancellationToken)
     {
         return bot.ExecuteAsync(new AnswerCallbackQuery(callbackQueryId) { Text = text, ShowAlert = false }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns basic information about a file, which can be used for downloading the file.
+    /// </summary>
+    /// <param name="FileId">File identifier to get information about.</param>
+    public sealed record GetFile(string FileId) : ApiRequest<File>("getFile");
+
+    public static Task<File> GetFileAsync(this IBot bot, string fileId, CancellationToken cancellationToken)
+    {
+        return bot.ExecuteAsync(new GetFile(fileId), cancellationToken);
+    }
+
+    public static async Task<Stream> GetStreamAsync(this IBot bot, string fileId, CancellationToken cancellationToken)
+    {
+        var file = await bot.GetFileAsync(fileId, cancellationToken).ConfigureAwait(false);
+        return await bot.GetStreamAsync(file, cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async Task<Stream> GetStreamAsync(this IBot bot, File file, CancellationToken cancellationToken)
+    {
+        var fileName = System.IO.Path.GetTempFileName();
+
+        await using (var stream = System.IO.File.OpenWrite(fileName))
+        {
+            await bot.DownloadAsync(file, stream, cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return System.IO.File.OpenRead(fileName);
     }
 }

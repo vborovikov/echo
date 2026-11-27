@@ -21,6 +21,16 @@ public interface IBot : IDisposable
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A task that completes when the request is executed.</returns>
     Task<TResult> ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Downloads a file from Telegram.
+    /// </summary>
+    /// <param name="file">The file to download.</param>
+    /// <param name="stream">The stream to download the file to.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task that completes when the file is downloaded.</returns>
+    /// <exception cref="ArgumentException">Throws if the file has no path.</exception>
+    Task DownloadAsync(File file, Stream stream, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -85,7 +95,7 @@ public sealed class TelegramBot : IBot
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri($"/bot{this.token}/{request.Method}", UriKind.Relative))
         {
-            Content = JsonContent.Create(request, request.GetType(), jsonMediaType, jsonOptions)
+            Content = CreateContent(request)
         };
         using var httpResponse = await this.http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
@@ -101,6 +111,34 @@ public sealed class TelegramBot : IBot
         }
 
         return response.Result;
+    }
+
+    /// <inheritdoc/>
+    public async Task DownloadAsync(File file, Stream stream, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        if (file.FilePath is null)
+        {
+            throw new ArgumentException($"The file has no path to download from. {nameof(file.FilePath)}", nameof(file));
+        }
+
+        this.log.LogTrace(EventIds.BotExecuting, "Downloading file '{FilePath}'", file.FilePath);
+
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"/file/bot{this.token}/{file.FilePath}", UriKind.Relative));
+        using var httpResponse = await this.http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        httpResponse.EnsureSuccessStatusCode();
+
+        await httpResponse.Content.CopyToAsync(stream, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static HttpContent CreateContent<TResult>(ApiRequest<TResult> request)
+    {
+        if (request is ApiForm<TResult> { HasContent: true } form)
+        {
+            return form.Submit(jsonMediaType, jsonOptions);
+        }
+
+        return JsonContent.Create(request, request.GetType(), jsonMediaType, jsonOptions);
     }
 }
 

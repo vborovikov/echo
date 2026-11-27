@@ -101,6 +101,9 @@ public abstract class BotOperator<TBotChat> : IBotOperator<TBotChat>
     Task<TResult> IBot.ExecuteAsync<TResult>(ApiRequest<TResult> request, CancellationToken cancellationToken) =>
         this.bot.ExecuteAsync(request, cancellationToken);
 
+    Task IBot.DownloadAsync(File file, Stream stream, CancellationToken cancellationToken) =>
+        this.bot.DownloadAsync(file, stream, cancellationToken);
+
     async Task<TBotChat> IBotOperator<TBotChat>.StartAsync(ChatId chatId, CancellationToken cancellationToken)
     {
         var session = GetChatSession(chatId, out var maybeNew);
